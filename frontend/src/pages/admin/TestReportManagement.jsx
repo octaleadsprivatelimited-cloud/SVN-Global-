@@ -21,6 +21,7 @@ const TestReportManagement = () => {
   })
   const [newCertification, setNewCertification] = useState('')
   const [newParameter, setNewParameter] = useState('')
+  const [file, setFile] = useState(null)
 
   useEffect(() => {
     checkAuth()
@@ -81,6 +82,7 @@ const TestReportManagement = () => {
       certifications: [...report.certifications],
       parameters: [...report.parameters]
     })
+    setFile(null)
     setShowForm(true)
   }
 
@@ -95,6 +97,7 @@ const TestReportManagement = () => {
       certifications: [],
       parameters: []
     })
+    setFile(null)
     setShowForm(true)
   }
 
@@ -107,20 +110,53 @@ const TestReportManagement = () => {
       
       const method = editingReport ? 'PUT' : 'POST'
       
+      // Create FormData for file upload
+      const formDataToSend = new FormData()
+      
+      // Add file if selected
+      if (file) {
+        formDataToSend.append('file', file)
+      }
+      
+      // Add other form data as JSON string
+      const dataToSend = {
+        title: formData.title,
+        category: formData.category,
+        date: formData.date,
+        description: formData.description,
+        certifications: formData.certifications,
+        parameters: formData.parameters
+      }
+      
+      // If editing and no new file, keep existing file URL
+      if (editingReport && !file) {
+        dataToSend.file = formData.file
+      }
+      
+      formDataToSend.append('data', JSON.stringify(dataToSend))
+      
       const response = await fetch(url, {
         method,
-        headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify(formData)
+        body: formDataToSend
       })
 
       const data = await response.json()
       if (data.success) {
         setShowForm(false)
+        setFile(null)
         fetchReports()
       }
     } catch (error) {
       console.error('Error saving report:', error)
+      alert('Error saving report: ' + error.message)
+    }
+  }
+  
+  const handleFileChange = (e) => {
+    const selectedFile = e.target.files[0]
+    if (selectedFile) {
+      setFile(selectedFile)
     }
   }
 
@@ -246,15 +282,20 @@ const TestReportManagement = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-semibold mb-2">File URL *</label>
+                <label className="block text-sm font-semibold mb-2">PDF File *</label>
                 <input
-                  type="text"
-                  value={formData.file}
-                  onChange={(e) => setFormData({ ...formData, file: e.target.value })}
+                  type="file"
+                  accept=".pdf,application/pdf"
+                  onChange={handleFileChange}
                   className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-metallic-gold"
-                  placeholder="/Quartz_Test_Report_June_2025.pdf"
-                  required
+                  required={!editingReport || !formData.file}
                 />
+                {file && (
+                  <p className="text-sm text-green-600 mt-1">✓ {file.name} selected</p>
+                )}
+                {!file && formData.file && (
+                  <p className="text-sm text-gray-500 mt-1">Current: {formData.file} (upload new to replace)</p>
+                )}
               </div>
 
               <div>
