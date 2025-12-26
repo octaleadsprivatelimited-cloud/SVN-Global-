@@ -57,7 +57,8 @@ const AdminLogin = () => {
         } catch (e) {
           // If response is not JSON, use default message
           if (response.status === 0 || response.status >= 500) {
-            errorMessage = `Cannot connect to server. Please make sure the backend server is running${API_URL ? ` at ${API_URL}` : ''}`
+            const apiHint = API_URL || (typeof window !== 'undefined' ? window.location.origin : '')
+            errorMessage = `Cannot connect to server. Please make sure the backend server is running${apiHint ? ` at ${apiHint}` : ''}`
           }
         }
         setError(errorMessage)
@@ -74,7 +75,8 @@ const AdminLogin = () => {
       }
     } catch (error) {
       console.error('Login error:', error)
-      setError(`Cannot connect to server. Please make sure the backend server is running${API_URL ? ` at ${API_URL}` : ''}`)
+      const apiHint = API_URL || (typeof window !== 'undefined' ? window.location.origin : '')
+      setError(`Cannot connect to server. Please make sure the backend server is running${apiHint ? ` at ${apiHint}` : ''}. If backend is on a different domain, set VITE_API_URL environment variable.`)
     } finally {
       setLoading(false)
     }
