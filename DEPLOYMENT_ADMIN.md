@@ -6,12 +6,20 @@
 
 1. **Set API URL (if frontend and backend are on different domains):**
 
-   Create a `.env` file in the `frontend` directory:
+   Create a `.env.production` file in the `frontend` directory:
    ```env
    VITE_API_URL=https://your-backend-domain.com
    ```
 
-   **Note:** If frontend and backend are on the same domain, leave `VITE_API_URL` empty to use relative URLs.
+   **OR** set it in your hosting platform's environment variables:
+   - Vercel: Add `VITE_API_URL` in project settings
+   - Netlify: Add `VITE_API_URL` in site settings > Environment variables
+   - Other platforms: Add as build-time environment variable
+
+   **Important:** 
+   - If frontend and backend are on the **same domain**, leave `VITE_API_URL` empty (uses relative URLs automatically)
+   - If frontend and backend are on **different domains**, set `VITE_API_URL` to your backend URL
+   - After setting the variable, **rebuild** the frontend: `npm run build`
 
 2. **Build the frontend:**
    ```bash
