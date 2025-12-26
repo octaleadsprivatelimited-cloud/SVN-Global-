@@ -5,14 +5,24 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 3003,
-    host: 'localhost', // Listen on localhost for better browser compatibility
-    open: true, // Automatically open browser
+    host: 'localhost',
+    open: true,
     proxy: {
       '/api': {
         target: 'http://localhost:5000',
         changeOrigin: true
       }
     }
+  },
+  preview: {
+    port: 3003,
+    host: 'localhost'
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: undefined
+      }
+    }
   }
 })
-
