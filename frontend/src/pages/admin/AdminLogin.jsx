@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Lock, User, Shield } from 'lucide-react'
+import { API_URL } from '../../config/api'
 
 const AdminLogin = () => {
   const [username, setUsername] = useState('')
@@ -17,7 +18,7 @@ const AdminLogin = () => {
 
   const checkAuth = async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/admin/check-auth', {
+      const response = await fetch(`${API_URL}/api/admin/check-auth`, {
         credentials: 'include'
       })
       if (response.ok) {
@@ -38,7 +39,7 @@ const AdminLogin = () => {
     setLoading(true)
 
     try {
-      const response = await fetch('http://localhost:5000/api/admin/login', {
+      const response = await fetch(`${API_URL}/api/admin/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -56,7 +57,7 @@ const AdminLogin = () => {
         } catch (e) {
           // If response is not JSON, use default message
           if (response.status === 0 || response.status >= 500) {
-            errorMessage = 'Cannot connect to server. Please make sure the backend server is running on http://localhost:5000'
+            errorMessage = `Cannot connect to server. Please make sure the backend server is running${API_URL ? ` at ${API_URL}` : ''}`
           }
         }
         setError(errorMessage)
@@ -73,7 +74,7 @@ const AdminLogin = () => {
       }
     } catch (error) {
       console.error('Login error:', error)
-      setError('Cannot connect to server. Please make sure the backend server is running on http://localhost:5000')
+      setError(`Cannot connect to server. Please make sure the backend server is running${API_URL ? ` at ${API_URL}` : ''}`)
     } finally {
       setLoading(false)
     }
@@ -149,9 +150,11 @@ const AdminLogin = () => {
 
           <div className="mt-6 text-center text-sm text-gray-500">
             <p>Default credentials: admin / admin123</p>
-            <p className="mt-2 text-xs text-gray-400">
-              Make sure the backend server is running on http://localhost:5000
-            </p>
+            {import.meta.env.DEV && (
+              <p className="mt-2 text-xs text-gray-400">
+                Make sure the backend server is running on http://localhost:5000
+              </p>
+            )}
           </div>
         </div>
       </motion.div>

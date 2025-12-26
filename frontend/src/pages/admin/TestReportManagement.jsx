@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { FileText, Plus, Edit, Trash2, ArrowLeft, Save, X } from 'lucide-react'
+import { API_URL } from '../../config/api'
 
 const TestReportManagement = () => {
   const navigate = useNavigate()
@@ -28,7 +29,7 @@ const TestReportManagement = () => {
 
   const checkAuth = async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/admin/check-auth', {
+      const response = await fetch(`${API_URL}/api/admin/check-auth`, {
         credentials: 'include'
       })
       const data = await response.json()
@@ -42,7 +43,7 @@ const TestReportManagement = () => {
 
   const fetchReports = async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/test-reports')
+      const response = await fetch(`${API_URL}/api/test-reports`)
       const data = await response.json()
       setReports(data)
     } catch (error) {
@@ -56,7 +57,7 @@ const TestReportManagement = () => {
     if (!window.confirm('Are you sure you want to delete this test report?')) return
 
     try {
-      const response = await fetch(`http://localhost:5000/api/admin/test-reports/${id}`, {
+      const response = await fetch(`${API_URL}/api/admin/test-reports/${id}`, {
         method: 'DELETE',
         credentials: 'include'
       })
@@ -101,8 +102,8 @@ const TestReportManagement = () => {
     e.preventDefault()
     try {
       const url = editingReport
-        ? `http://localhost:5000/api/admin/test-reports/${editingReport}`
-        : 'http://localhost:5000/api/admin/test-reports'
+        ? `${API_URL}/api/admin/test-reports/${editingReport}`
+        : `${API_URL}/api/admin/test-reports`
       
       const method = editingReport ? 'PUT' : 'POST'
       
