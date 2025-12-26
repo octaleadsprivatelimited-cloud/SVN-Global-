@@ -4,30 +4,33 @@ import App from './App.jsx'
 import ErrorBoundary from './ErrorBoundary.jsx'
 import './index.css'
 
-// Show loading message immediately
+// Get root element
 const rootElement = document.getElementById('root')
-if (rootElement) {
-  rootElement.innerHTML = '<div style="padding: 50px; text-align: center; font-size: 18px;">Loading...</div>'
-}
-
-console.log('Main.jsx is loading...')
-console.log('Root element:', rootElement)
 
 if (!rootElement) {
-  console.error('Root element not found!')
-  document.body.innerHTML = '<div style="padding: 50px; font-size: 24px; color: red;">Error: Root element not found!</div>'
+  // If root element doesn't exist, create it
+  const newRoot = document.createElement('div')
+  newRoot.id = 'root'
+  document.body.appendChild(newRoot)
+  
+  const root = ReactDOM.createRoot(newRoot)
+  root.render(
+    <React.StrictMode>
+      <ErrorBoundary>
+        <App />
+      </ErrorBoundary>
+    </React.StrictMode>
+  )
 } else {
   try {
-    console.log('Attempting to render React app...')
     const root = ReactDOM.createRoot(rootElement)
     root.render(
       <React.StrictMode>
         <ErrorBoundary>
           <App />
         </ErrorBoundary>
-      </React.StrictMode>,
+      </React.StrictMode>
     )
-    console.log('React app rendered successfully!')
   } catch (error) {
     console.error('Error rendering React app:', error)
     rootElement.innerHTML = `<div style="padding: 50px; font-size: 18px; color: red;">
@@ -38,4 +41,3 @@ if (!rootElement) {
     </div>`
   }
 }
-

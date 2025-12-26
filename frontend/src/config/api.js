@@ -55,8 +55,8 @@ export const getApiEndpoint = (endpoint) => {
   return `${baseUrl}${cleanEndpoint}`
 }
 
-// Debug information (visible in browser console)
-if (typeof window !== 'undefined') {
+// Debug information (only in development to avoid console spam)
+if (typeof window !== 'undefined' && (import.meta.env.DEV || window.location.hostname === 'localhost')) {
   console.log('🔧 API Configuration:', {
     'API_URL': API_URL || '(relative URLs - same origin)',
     'Current Origin': window.location.origin,

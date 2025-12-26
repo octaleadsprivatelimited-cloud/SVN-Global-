@@ -23,6 +23,10 @@ export default defineConfig({
       output: {
         manualChunks: undefined
       }
-    }
+    },
+    // Ensure proper base path for deployment
+    base: '/',
+    // Increase chunk size warning limit
+    chunkSizeWarningLimit: 1000
   }
 })
