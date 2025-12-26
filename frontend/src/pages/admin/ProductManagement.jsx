@@ -21,6 +21,9 @@ const ProductManagement = () => {
   })
   const [newFeature, setNewFeature] = useState('')
   const [newApplication, setNewApplication] = useState('')
+  const [imageFile, setImageFile] = useState(null)
+  const [testReportFile, setTestReportFile] = useState(null)
+  const [imagePreview, setImagePreview] = useState('')
 
   useEffect(() => {
     checkAuth()
@@ -81,6 +84,9 @@ const ProductManagement = () => {
       applications: [...product.applications],
       testReport: product.testReport || ''
     })
+    setImageFile(null)
+    setTestReportFile(null)
+    setImagePreview(product.image || '')
     setShowForm(true)
   }
 
@@ -95,6 +101,9 @@ const ProductManagement = () => {
       applications: [],
       testReport: ''
     })
+    setImageFile(null)
+    setTestReportFile(null)
+    setImagePreview('')
     setShowForm(true)
   }
 
@@ -107,20 +116,73 @@ const ProductManagement = () => {
       
       const method = editingProduct ? 'PUT' : 'POST'
       
+      // Create FormData for file upload
+      const formDataToSend = new FormData()
+      
+      // Add files if selected
+      if (imageFile) {
+        formDataToSend.append('image', imageFile)
+      }
+      if (testReportFile) {
+        formDataToSend.append('testReport', testReportFile)
+      }
+      
+      // Add other form data as JSON string
+      const dataToSend = {
+        title: formData.title,
+        description: formData.description,
+        icon: formData.icon,
+        features: formData.features,
+        applications: formData.applications
+      }
+      
+      // If editing and no new files, keep existing URLs
+      if (editingProduct && !imageFile) {
+        dataToSend.image = formData.image
+      }
+      if (editingProduct && !testReportFile) {
+        dataToSend.testReport = formData.testReport
+      }
+      
+      formDataToSend.append('data', JSON.stringify(dataToSend))
+      
       const response = await fetch(url, {
         method,
-        headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify(formData)
+        body: formDataToSend
       })
 
       const data = await response.json()
       if (data.success) {
         setShowForm(false)
+        setImageFile(null)
+        setTestReportFile(null)
+        setImagePreview('')
         fetchProducts()
       }
     } catch (error) {
       console.error('Error saving product:', error)
+      alert('Error saving product: ' + error.message)
+    }
+  }
+  
+  const handleImageChange = (e) => {
+    const file = e.target.files[0]
+    if (file) {
+      setImageFile(file)
+      // Create preview
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        setImagePreview(reader.result)
+      }
+      reader.readAsDataURL(file)
+    }
+  }
+  
+  const handleTestReportChange = (e) => {
+    const file = e.target.files[0]
+    if (file) {
+      setTestReportFile(file)
     }
   }
 
@@ -209,15 +271,25 @@ const ProductManagement = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold mb-2">Image URL *</label>
+                  <label className="block text-sm font-semibold mb-2">Product Image *</label>
                   <input
-                    type="text"
-                    value={formData.image}
-                    onChange={(e) => setFormData({ ...formData, image: e.target.value })}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageChange}
                     className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-royal-blue"
-                    placeholder="/mica-flakes.jpg"
-                    required
+                    required={!editingProduct || !formData.image}
                   />
+                  {imagePreview && (
+                    <div className="mt-2">
+                      <img src={imagePreview} alt="Preview" className="h-32 w-auto rounded-lg border border-gray-200" />
+                    </div>
+                  )}
+                  {!imagePreview && formData.image && (
+                    <div className="mt-2">
+                      <img src={formData.image} alt="Current" className="h-32 w-auto rounded-lg border border-gray-200" />
+                      <p className="text-sm text-gray-500 mt-1">Current image (upload new to replace)</p>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -309,14 +381,19 @@ const ProductManagement = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-semibold mb-2">Test Report URL</label>
+                <label className="block text-sm font-semibold mb-2">Test Report PDF</label>
                 <input
-                  type="text"
-                  value={formData.testReport}
-                  onChange={(e) => setFormData({ ...formData, testReport: e.target.value })}
+                  type="file"
+                  accept=".pdf,application/pdf"
+                  onChange={handleTestReportChange}
                   className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-royal-blue"
-                  placeholder="/Quartz_Test_Report_June_2025.pdf"
                 />
+                {testReportFile && (
+                  <p className="text-sm text-green-600 mt-1">✓ {testReportFile.name} selected</p>
+                )}
+                {!testReportFile && formData.testReport && (
+                  <p className="text-sm text-gray-500 mt-1">Current: {formData.testReport} (upload new to replace)</p>
+                )}
               </div>
 
               <div className="flex space-x-4">

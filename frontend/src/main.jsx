@@ -8,21 +8,13 @@ import './index.css'
 const rootElement = document.getElementById('root')
 
 if (!rootElement) {
-  // If root element doesn't exist, create it
-  const newRoot = document.createElement('div')
-  newRoot.id = 'root'
-  document.body.appendChild(newRoot)
-  
-  const root = ReactDOM.createRoot(newRoot)
-  root.render(
-    <React.StrictMode>
-      <ErrorBoundary>
-        <App />
-      </ErrorBoundary>
-    </React.StrictMode>
-  )
+  console.error('Root element not found!')
+  document.body.innerHTML = '<div style="padding: 50px; font-size: 24px; color: red;">Error: Root element not found!</div>'
 } else {
   try {
+    // Clear any loading message
+    rootElement.innerHTML = ''
+    
     const root = ReactDOM.createRoot(rootElement)
     root.render(
       <React.StrictMode>
@@ -31,8 +23,9 @@ if (!rootElement) {
         </ErrorBoundary>
       </React.StrictMode>
     )
+    console.log('✅ React app rendered successfully!')
   } catch (error) {
-    console.error('Error rendering React app:', error)
+    console.error('❌ Error rendering React app:', error)
     rootElement.innerHTML = `<div style="padding: 50px; font-size: 18px; color: red;">
       <h1>React Rendering Error</h1>
       <p>${error.message}</p>
