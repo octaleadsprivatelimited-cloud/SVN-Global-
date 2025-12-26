@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Package, Plus, Edit, Trash2, ArrowLeft, Save, X } from 'lucide-react'
-import { API_URL } from '../../config/api'
+import { getApiEndpoint } from '../../config/api'
 
 const ProductManagement = () => {
   const navigate = useNavigate()
@@ -29,7 +29,7 @@ const ProductManagement = () => {
 
   const checkAuth = async () => {
     try {
-      const response = await fetch(`${API_URL}/api/admin/check-auth`, {
+      const response = await fetch(getApiEndpoint('/api/admin/check-auth'), {
         credentials: 'include'
       })
       const data = await response.json()
@@ -43,7 +43,7 @@ const ProductManagement = () => {
 
   const fetchProducts = async () => {
     try {
-      const response = await fetch(`${API_URL}/api/products`)
+      const response = await fetch(getApiEndpoint('/api/products'))
       const data = await response.json()
       setProducts(data)
     } catch (error) {
@@ -57,7 +57,7 @@ const ProductManagement = () => {
     if (!window.confirm('Are you sure you want to delete this product?')) return
 
     try {
-      const response = await fetch(`${API_URL}/api/admin/products/${id}`, {
+      const response = await fetch(getApiEndpoint(`/api/admin/products/${id}`), {
         method: 'DELETE',
         credentials: 'include'
       })
@@ -102,8 +102,8 @@ const ProductManagement = () => {
     e.preventDefault()
     try {
       const url = editingProduct
-        ? `${API_URL}/api/admin/products/${editingProduct}`
-        : `${API_URL}/api/admin/products`
+        ? getApiEndpoint(`/api/admin/products/${editingProduct}`)
+        : getApiEndpoint('/api/admin/products')
       
       const method = editingProduct ? 'PUT' : 'POST'
       

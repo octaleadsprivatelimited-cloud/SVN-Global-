@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Lock, User, Shield } from 'lucide-react'
-import { API_URL } from '../../config/api'
+import { getApiEndpoint } from '../../config/api'
 
 const AdminLogin = () => {
   const [username, setUsername] = useState('')
@@ -18,7 +18,7 @@ const AdminLogin = () => {
 
   const checkAuth = async () => {
     try {
-      const response = await fetch(`${API_URL}/api/admin/check-auth`, {
+      const response = await fetch(getApiEndpoint('/api/admin/check-auth'), {
         credentials: 'include'
       })
       if (response.ok) {
@@ -39,7 +39,7 @@ const AdminLogin = () => {
     setLoading(true)
 
     try {
-      const response = await fetch(`${API_URL}/api/admin/login`, {
+      const response = await fetch(getApiEndpoint('/api/admin/login'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -57,12 +57,11 @@ const AdminLogin = () => {
         } catch (e) {
           // If response is not JSON, use default message
           if (response.status === 0 || response.status >= 500) {
-            const currentOrigin = typeof window !== 'undefined' ? window.location.origin : ''
-            const apiUrl = API_URL || currentOrigin
+            const apiEndpoint = getApiEndpoint('/api/admin/login')
             if (import.meta.env.DEV) {
-              errorMessage = `Cannot connect to backend server. Make sure it's running at http://localhost:5000`
+              errorMessage = `Cannot connect to backend server. Make sure it's running at http://localhost:5000. Attempted: ${apiEndpoint}`
             } else {
-              errorMessage = `Cannot connect to backend server at ${apiUrl || currentOrigin}. Please check your backend deployment and VITE_API_URL configuration.`
+              errorMessage = `Cannot connect to backend server. Attempted: ${apiEndpoint}. Please check: 1) Backend is deployed, 2) VITE_API_URL is set if backend is on different domain, 3) CORS is configured.`
             }
           }
         }
@@ -80,13 +79,12 @@ const AdminLogin = () => {
       }
     } catch (error) {
       console.error('Login error:', error)
-      const currentOrigin = typeof window !== 'undefined' ? window.location.origin : ''
-      const apiUrl = API_URL || currentOrigin
+      const apiEndpoint = getApiEndpoint('/api/admin/login')
       
       if (import.meta.env.DEV) {
-        setError('Cannot connect to backend server. Make sure it\'s running at http://localhost:5000')
+        setError(`Cannot connect to backend server. Make sure it's running at http://localhost:5000. Attempted: ${apiEndpoint}`)
       } else {
-        setError(`Cannot connect to backend server at ${apiUrl || currentOrigin}. Please ensure: 1) Backend is deployed and running, 2) VITE_API_URL is set correctly if backend is on a different domain, 3) CORS is configured properly.`)
+        setError(`Cannot connect to backend server. Attempted: ${apiEndpoint}. Please ensure: 1) Backend is deployed and running, 2) VITE_API_URL is set correctly if backend is on a different domain, 3) CORS is configured properly. Check browser console for more details.`)
       }
     } finally {
       setLoading(false)

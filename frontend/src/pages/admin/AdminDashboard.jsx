@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Package, FileText, LogOut, Home, Shield } from 'lucide-react'
-import { API_URL } from '../../config/api'
+import { getApiEndpoint } from '../../config/api'
 
 const AdminDashboard = () => {
   const navigate = useNavigate()
@@ -20,7 +20,7 @@ const AdminDashboard = () => {
 
   const checkAuth = async () => {
     try {
-      const response = await fetch(`${API_URL}/api/admin/check-auth`, {
+      const response = await fetch(getApiEndpoint('/api/admin/check-auth'), {
         credentials: 'include'
       })
       const data = await response.json()
@@ -39,8 +39,8 @@ const AdminDashboard = () => {
   const fetchStats = async () => {
     try {
       const [productsRes, reportsRes] = await Promise.all([
-        fetch(`${API_URL}/api/products`),
-        fetch(`${API_URL}/api/test-reports`)
+        fetch(getApiEndpoint('/api/products')),
+        fetch(getApiEndpoint('/api/test-reports'))
       ])
       const products = await productsRes.json()
       const reports = await reportsRes.json()
@@ -55,7 +55,7 @@ const AdminDashboard = () => {
 
   const handleLogout = async () => {
     try {
-      await fetch(`${API_URL}/api/admin/logout`, {
+      await fetch(getApiEndpoint('/api/admin/logout'), {
         method: 'POST',
         credentials: 'include'
       })
