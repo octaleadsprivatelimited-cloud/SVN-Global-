@@ -50,15 +50,20 @@ const AdminLogin = () => {
 
       if (!response.ok) {
         // Try to get error message from response
-        let errorMessage = 'Connection error. Please check if the backend server is running on port 5000.'
+        let errorMessage = 'Connection error. Unable to connect to the backend server.'
         try {
           const errorData = await response.json()
           errorMessage = errorData.message || errorMessage
         } catch (e) {
           // If response is not JSON, use default message
           if (response.status === 0 || response.status >= 500) {
-            const apiHint = API_URL || (typeof window !== 'undefined' ? window.location.origin : '')
-            errorMessage = `Cannot connect to server. Please make sure the backend server is running${apiHint ? ` at ${apiHint}` : ''}`
+            const currentOrigin = typeof window !== 'undefined' ? window.location.origin : ''
+            const apiUrl = API_URL || currentOrigin
+            if (import.meta.env.DEV) {
+              errorMessage = `Cannot connect to backend server. Make sure it's running at http://localhost:5000`
+            } else {
+              errorMessage = `Cannot connect to backend server at ${apiUrl || currentOrigin}. Please check your backend deployment and VITE_API_URL configuration.`
+            }
           }
         }
         setError(errorMessage)
@@ -75,8 +80,14 @@ const AdminLogin = () => {
       }
     } catch (error) {
       console.error('Login error:', error)
-      const apiHint = API_URL || (typeof window !== 'undefined' ? window.location.origin : '')
-      setError(`Cannot connect to server. Please make sure the backend server is running${apiHint ? ` at ${apiHint}` : ''}. If backend is on a different domain, set VITE_API_URL environment variable.`)
+      const currentOrigin = typeof window !== 'undefined' ? window.location.origin : ''
+      const apiUrl = API_URL || currentOrigin
+      
+      if (import.meta.env.DEV) {
+        setError('Cannot connect to backend server. Make sure it\'s running at http://localhost:5000')
+      } else {
+        setError(`Cannot connect to backend server at ${apiUrl || currentOrigin}. Please ensure: 1) Backend is deployed and running, 2) VITE_API_URL is set correctly if backend is on a different domain, 3) CORS is configured properly.`)
+      }
     } finally {
       setLoading(false)
     }
