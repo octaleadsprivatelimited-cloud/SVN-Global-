@@ -4,10 +4,20 @@ import dotenv from 'dotenv'
 dotenv.config()
 
 // MongoDB Connection String
-// Priority: MONGO_URI > MONGODB_URI > fallback
+// MUST be provided via environment variables for security
+// Priority: MONGO_URI > MONGODB_URI
 // Format: mongodb+srv://username:password@cluster.mongodb.net/database?options
-// Password: Svnglobal@2025 (URL encoded as %40 in connection string)
-const uri = process.env.MONGO_URI || process.env.MONGODB_URI || 'mongodb+srv://svnglobal:Svnglobal%402025@svnglobal.5vlys7w.mongodb.net/svnglobal?retryWrites=true&w=majority&appName=svnglobal'
+const uri = process.env.MONGO_URI || process.env.MONGODB_URI
+
+// Validate that connection string is provided
+if (!uri) {
+  const error = new Error(
+    'MongoDB connection string is required. Please set MONGO_URI or MONGODB_URI environment variable.\n' +
+    'Example: mongodb+srv://username:password@cluster.mongodb.net/database?options'
+  )
+  console.error('❌ FATAL ERROR:', error.message)
+  throw error
+}
 
 // Global connection for serverless (Vercel reuses connections)
 let cachedClient = null
@@ -19,10 +29,6 @@ export const connectDB = async () => {
     if (cachedClient && cachedDb) {
       console.log('✅ Using cached MongoDB connection')
       return cachedDb
-    }
-
-    if (!uri) {
-      throw new Error('MONGO_URI or MONGODB_URI environment variable is not set')
     }
 
     console.log('🔄 Creating new MongoDB connection...')
