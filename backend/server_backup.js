@@ -6,6 +6,10 @@ import path from 'path'
 import { fileURLToPath } from 'url'
 import bcrypt from 'bcryptjs'
 import session from 'express-session'
+import { connectDB } from './config/mongodb.js'
+import * as ProductsModel from './models/products.js'
+import * as TestReportsModel from './models/testReports.js'
+import { getAdmin, verifyAdminPassword } from './models/admin.js'
 
 dotenv.config()
 
@@ -14,6 +18,9 @@ const __dirname = path.dirname(__filename)
 
 const app = express()
 const PORT = process.env.PORT || 5000
+
+// Connect to MongoDB
+connectDB().catch(console.error)
 
 // Middleware
 // CORS configuration - allows requests from frontend
@@ -58,28 +65,7 @@ app.use(session({
   }
 }))
 
-// Helper functions to read/write JSON files
-const readJSON = (filename) => {
-  try {
-    const filePath = path.join(__dirname, 'data', filename)
-    const data = fs.readFileSync(filePath, 'utf8')
-    return JSON.parse(data)
-  } catch (error) {
-    console.error(`Error reading ${filename}:`, error)
-    return null
-  }
-}
-
-const writeJSON = (filename, data) => {
-  try {
-    const filePath = path.join(__dirname, 'data', filename)
-    fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf8')
-    return true
-  } catch (error) {
-    console.error(`Error writing ${filename}:`, error)
-    return false
-  }
-}
+// JSON file helper functions removed - using MongoDB instead
 
 // Authentication middleware
 const requireAuth = (req, res, next) => {
@@ -143,37 +129,16 @@ app.post('/api/admin/login', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Username and password are required' })
     }
 
-    const admin = readJSON('admin.json')
+    const admin = await getAdmin()
 
-    if (!admin) {
-      console.error('Admin data not found')
+    if (!admin || username !== admin.username) {
       return res.status(401).json({ success: false, message: 'Invalid credentials' })
     }
 
-    if (username !== admin.username) {
-      console.log(`Username mismatch: provided=${username}, expected=${admin.username}`)
-      return res.status(401).json({ success: false, message: 'Invalid credentials' })
-    }
-
-    // Check password - support both hashed and plain text (for migration)
-    let isValidPassword = false
-    if (admin.password) {
-      // Check if password is hashed (bcrypt hashes start with $2a$, $2b$, or $2y$)
-      if (admin.password.startsWith('$2a$') || admin.password.startsWith('$2b$') || admin.password.startsWith('$2y$')) {
-        // Hashed password - use bcrypt.compare
-        isValidPassword = await bcrypt.compare(password, admin.password)
-        console.log(`Password check (hashed): ${isValidPassword}`)
-      } else {
-        // Plain text password (for backward compatibility during migration)
-        isValidPassword = (password === admin.password)
-        console.log(`Password check (plain): ${isValidPassword}`)
-      }
-    } else {
-      console.error('Admin password not found')
-    }
+    // Verify password
+    const isValidPassword = await verifyAdminPassword(password, admin.password)
 
     if (!isValidPassword) {
-      console.log('Login failed: Invalid password')
       return res.status(401).json({ success: false, message: 'Invalid credentials' })
     }
 
@@ -203,122 +168,138 @@ app.get('/api/admin/check-auth', (req, res) => {
 // ============ PRODUCTS API ============
 
 // Get all products
-app.get('/api/products', (req, res) => {
-  const products = readJSON('products.json')
-  res.json(products || [])
+app.get('/api/products', async (req, res) => {
+  try {
+    const products = await ProductsModel.getAllProducts()
+    res.json(products || [])
+  } catch (error) {
+    console.error('Error fetching products:', error)
+    res.status(500).json({ success: false, message: 'Error fetching products' })
+  }
 })
 
 // Get single product
-app.get('/api/products/:id', (req, res) => {
-  const products = readJSON('products.json')
-  const product = products.find(p => p.id === parseInt(req.params.id))
-  if (product) {
-    res.json(product)
-  } else {
-    res.status(404).json({ success: false, message: 'Product not found' })
+app.get('/api/products/:id', async (req, res) => {
+  try {
+    const product = await ProductsModel.getProductById(req.params.id)
+    if (product) {
+      res.json(product)
+    } else {
+      res.status(404).json({ success: false, message: 'Product not found' })
+    }
+  } catch (error) {
+    console.error('Error fetching product:', error)
+    res.status(500).json({ success: false, message: 'Error fetching product' })
   }
 })
 
 // Create product (Admin only)
-app.post('/api/admin/products', requireAuth, (req, res) => {
-  const products = readJSON('products.json') || []
-  const newProduct = {
-    id: products.length > 0 ? Math.max(...products.map(p => p.id)) + 1 : 1,
-    ...req.body
-  }
-  products.push(newProduct)
-  if (writeJSON('products.json', products)) {
+app.post('/api/admin/products', requireAuth, async (req, res) => {
+  try {
+    const newProduct = await ProductsModel.createProduct(req.body)
     res.json({ success: true, product: newProduct })
-  } else {
-    res.status(500).json({ success: false, message: 'Failed to create product' })
+  } catch (error) {
+    console.error('Error creating product:', error)
+    res.status(500).json({ success: false, message: 'Error creating product: ' + error.message })
   }
 })
 
 // Update product (Admin only)
-app.put('/api/admin/products/:id', requireAuth, (req, res) => {
-  const products = readJSON('products.json') || []
-  const index = products.findIndex(p => p.id === parseInt(req.params.id))
-  if (index !== -1) {
-    products[index] = { ...products[index], ...req.body, id: parseInt(req.params.id) }
-    if (writeJSON('products.json', products)) {
-      res.json({ success: true, product: products[index] })
+app.put('/api/admin/products/:id', requireAuth, async (req, res) => {
+  try {
+    const updatedProduct = await ProductsModel.updateProduct(req.params.id, req.body)
+    if (updatedProduct) {
+      res.json({ success: true, product: updatedProduct })
     } else {
-      res.status(500).json({ success: false, message: 'Failed to update product' })
+      res.status(404).json({ success: false, message: 'Product not found' })
     }
-  } else {
-    res.status(404).json({ success: false, message: 'Product not found' })
+  } catch (error) {
+    console.error('Error updating product:', error)
+    res.status(500).json({ success: false, message: 'Error updating product: ' + error.message })
   }
 })
 
 // Delete product (Admin only)
-app.delete('/api/admin/products/:id', requireAuth, (req, res) => {
-  const products = readJSON('products.json') || []
-  const filtered = products.filter(p => p.id !== parseInt(req.params.id))
-  if (writeJSON('products.json', filtered)) {
-    res.json({ success: true, message: 'Product deleted successfully' })
-  } else {
-    res.status(500).json({ success: false, message: 'Failed to delete product' })
+app.delete('/api/admin/products/:id', requireAuth, async (req, res) => {
+  try {
+    const deleted = await ProductsModel.deleteProduct(req.params.id)
+    if (deleted) {
+      res.json({ success: true, message: 'Product deleted successfully' })
+    } else {
+      res.status(404).json({ success: false, message: 'Product not found' })
+    }
+  } catch (error) {
+    console.error('Error deleting product:', error)
+    res.status(500).json({ success: false, message: 'Error deleting product' })
   }
 })
 
 // ============ TEST REPORTS API ============
 
 // Get all test reports
-app.get('/api/test-reports', (req, res) => {
-  const reports = readJSON('testReports.json')
-  res.json(reports || [])
+app.get('/api/test-reports', async (req, res) => {
+  try {
+    const reports = await TestReportsModel.getAllTestReports()
+    res.json(reports || [])
+  } catch (error) {
+    console.error('Error fetching test reports:', error)
+    res.status(500).json({ success: false, message: 'Error fetching test reports' })
+  }
 })
 
 // Get single test report
-app.get('/api/test-reports/:id', (req, res) => {
-  const reports = readJSON('testReports.json')
-  const report = reports.find(r => r.id === parseInt(req.params.id))
-  if (report) {
-    res.json(report)
-  } else {
-    res.status(404).json({ success: false, message: 'Test report not found' })
+app.get('/api/test-reports/:id', async (req, res) => {
+  try {
+    const report = await TestReportsModel.getTestReportById(req.params.id)
+    if (report) {
+      res.json(report)
+    } else {
+      res.status(404).json({ success: false, message: 'Test report not found' })
+    }
+  } catch (error) {
+    console.error('Error fetching test report:', error)
+    res.status(500).json({ success: false, message: 'Error fetching test report' })
   }
 })
 
 // Create test report (Admin only)
-app.post('/api/admin/test-reports', requireAuth, (req, res) => {
-  const reports = readJSON('testReports.json') || []
-  const newReport = {
-    id: reports.length > 0 ? Math.max(...reports.map(r => r.id)) + 1 : 1,
-    ...req.body
-  }
-  reports.push(newReport)
-  if (writeJSON('testReports.json', reports)) {
+app.post('/api/admin/test-reports', requireAuth, async (req, res) => {
+  try {
+    const newReport = await TestReportsModel.createTestReport(req.body)
     res.json({ success: true, report: newReport })
-  } else {
-    res.status(500).json({ success: false, message: 'Failed to create test report' })
+  } catch (error) {
+    console.error('Error creating test report:', error)
+    res.status(500).json({ success: false, message: 'Error creating test report: ' + error.message })
   }
 })
 
 // Update test report (Admin only)
-app.put('/api/admin/test-reports/:id', requireAuth, (req, res) => {
-  const reports = readJSON('testReports.json') || []
-  const index = reports.findIndex(r => r.id === parseInt(req.params.id))
-  if (index !== -1) {
-    reports[index] = { ...reports[index], ...req.body, id: parseInt(req.params.id) }
-    if (writeJSON('testReports.json', reports)) {
-      res.json({ success: true, report: reports[index] })
+app.put('/api/admin/test-reports/:id', requireAuth, async (req, res) => {
+  try {
+    const updatedReport = await TestReportsModel.updateTestReport(req.params.id, req.body)
+    if (updatedReport) {
+      res.json({ success: true, report: updatedReport })
     } else {
-      res.status(500).json({ success: false, message: 'Failed to update test report' })
+      res.status(404).json({ success: false, message: 'Test report not found' })
     }
-  } else {
-    res.status(404).json({ success: false, message: 'Test report not found' })
+  } catch (error) {
+    console.error('Error updating test report:', error)
+    res.status(500).json({ success: false, message: 'Error updating test report: ' + error.message })
   }
 })
 
 // Delete test report (Admin only)
-app.delete('/api/admin/test-reports/:id', requireAuth, (req, res) => {
-  const reports = readJSON('testReports.json') || []
-  const filtered = reports.filter(r => r.id !== parseInt(req.params.id))
-  if (writeJSON('testReports.json', filtered)) {
-    res.json({ success: true, message: 'Test report deleted successfully' })
-  } else {
-    res.status(500).json({ success: false, message: 'Failed to delete test report' })
+app.delete('/api/admin/test-reports/:id', requireAuth, async (req, res) => {
+  try {
+    const deleted = await TestReportsModel.deleteTestReport(req.params.id)
+    if (deleted) {
+      res.json({ success: true, message: 'Test report deleted successfully' })
+    } else {
+      res.status(404).json({ success: false, message: 'Test report not found' })
+    }
+  } catch (error) {
+    console.error('Error deleting test report:', error)
+    res.status(500).json({ success: false, message: 'Error deleting test report' })
   }
 })
 
