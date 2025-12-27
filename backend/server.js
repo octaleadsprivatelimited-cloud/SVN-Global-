@@ -5,7 +5,7 @@ import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import bcrypt from 'bcryptjs'
-import session from 'express-session'
+import cookieSession from 'cookie-session'
 import { connectDB } from './config/mongodb.js'
 import * as ProductsModel from './models/products.js'
 import * as TestReportsModel from './models/testReports.js'
@@ -17,18 +17,17 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
 const app = express()
-const PORT = process.env.PORT || 5000
 
-// Connect to MongoDB
-connectDB().catch(console.error)
-
-// Middleware
 // CORS configuration - allows requests from frontend
+// Support both development and production URLs
 const allowedOrigins = [
   'http://localhost:3003',
+  'http://localhost:5173',
   process.env.FRONTEND_URL,
-  process.env.VITE_FRONTEND_URL
-].filter(Boolean) // Remove undefined values
+  process.env.VITE_FRONTEND_URL,
+  process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null,
+  process.env.NEXT_PUBLIC_VERCEL_URL ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}` : null,
+].filter(Boolean)
 
 app.use(cors({
   origin: function (origin, callback) {
@@ -40,32 +39,41 @@ app.use(cors({
       return callback(null, true)
     }
     
-    // In production, allow requests from allowed origins
-    if (allowedOrigins.includes(origin)) {
+    // In production, check allowed origins
+    if (allowedOrigins.length > 0 && allowedOrigins.some(allowed => origin.includes(allowed.replace('https://', '').replace('http://', '')))) {
       callback(null, true)
-    } else {
-      // For production, you can restrict this to specific domains
-      // For now, allow all origins (update this for better security)
+    } else if (allowedOrigins.length === 0) {
+      // If no specific origins set, allow all (for testing)
       console.log(`CORS: Allowing request from origin: ${origin}`)
       callback(null, true)
+    } else {
+      console.log(`CORS: Rejecting request from origin: ${origin}`)
+      callback(new Error('Not allowed by CORS'))
     }
   },
-  credentials: true
-}))
-app.use(express.json())
-app.use(express.urlencoded({ extended: true }))
-app.use(session({
-  secret: process.env.SESSION_SECRET || 'svn-global-secret-key-2024',
-  resave: false,
-  saveUninitialized: false,
-  cookie: {
-    secure: false,
-    httpOnly: true,
-    maxAge: 24 * 60 * 60 * 1000 // 24 hours
-  }
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }))
 
-// JSON file helper functions removed - using MongoDB instead
+app.use(express.json({ limit: '10mb' }))
+app.use(express.urlencoded({ extended: true, limit: '10mb' }))
+
+// Cookie session for serverless compatibility (Vercel)
+app.use(cookieSession({
+  name: 'session',
+  keys: [process.env.SESSION_SECRET || 'svn-global-secret-key-2024-change-in-production'],
+  maxAge: 24 * 60 * 60 * 1000, // 24 hours
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production', // Use secure cookies in production (HTTPS)
+  sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // Required for cross-origin in production
+}))
+
+// Initialize MongoDB connection (for serverless, this is cached)
+connectDB().catch((error) => {
+  console.error('Failed to connect to MongoDB on startup:', error.message)
+  // Don't throw - connection will be retried on first request
+})
 
 // Authentication middleware
 const requireAuth = (req, res, next) => {
@@ -75,6 +83,28 @@ const requireAuth = (req, res, next) => {
     res.status(401).json({ success: false, message: 'Unauthorized' })
   }
 }
+
+// Health check endpoint (useful for Vercel)
+app.get('/api/health', async (req, res) => {
+  try {
+    // Test MongoDB connection
+    await connectDB()
+    res.json({ 
+      status: 'ok', 
+      message: 'SVN Global API is running',
+      mongodb: 'connected',
+      timestamp: new Date().toISOString()
+    })
+  } catch (error) {
+    res.status(503).json({ 
+      status: 'error', 
+      message: 'SVN Global API is running but MongoDB connection failed',
+      mongodb: 'disconnected',
+      error: error.message,
+      timestamp: new Date().toISOString()
+    })
+  }
+})
 
 // Contact form endpoint
 app.post('/api/contact', async (req, res) => {
@@ -129,6 +159,8 @@ app.post('/api/admin/login', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Username and password are required' })
     }
 
+    // Ensure MongoDB is connected
+    await connectDB()
     const admin = await getAdmin()
 
     if (!admin || username !== admin.username) {
@@ -142,8 +174,11 @@ app.post('/api/admin/login', async (req, res) => {
       return res.status(401).json({ success: false, message: 'Invalid credentials' })
     }
 
+    // Set session
     req.session.isAuthenticated = true
     req.session.username = admin.username // Use username from MongoDB
+
+    console.log(`✅ Admin login successful: ${admin.username}`)
 
     res.json({ success: true, message: 'Login successful', username: admin.username })
   } catch (error) {
@@ -154,7 +189,7 @@ app.post('/api/admin/login', async (req, res) => {
 
 // Admin Logout
 app.post('/api/admin/logout', (req, res) => {
-  req.session.destroy()
+  req.session = null
   res.json({ success: true, message: 'Logged out successfully' })
 })
 
@@ -166,8 +201,15 @@ app.get('/api/admin/check-auth', async (req, res) => {
     
     if (isAuthenticated) {
       // Get username from MongoDB to ensure it's always current
-      const admin = await getAdmin()
-      username = admin ? admin.username : req.session.username
+      try {
+        await connectDB()
+        const admin = await getAdmin()
+        username = admin ? admin.username : req.session.username
+      } catch (error) {
+        // If MongoDB fails, use session username as fallback
+        username = req.session.username
+        console.error('Error fetching admin for check-auth:', error.message)
+      }
     }
     
     res.json({ 
@@ -188,17 +230,19 @@ app.get('/api/admin/check-auth', async (req, res) => {
 // Get all products
 app.get('/api/products', async (req, res) => {
   try {
+    await connectDB()
     const products = await ProductsModel.getAllProducts()
     res.json(products || [])
   } catch (error) {
     console.error('Error fetching products:', error)
-    res.status(500).json({ success: false, message: 'Error fetching products' })
+    res.status(500).json({ success: false, message: 'Error fetching products: ' + error.message })
   }
 })
 
 // Get single product
 app.get('/api/products/:id', async (req, res) => {
   try {
+    await connectDB()
     const product = await ProductsModel.getProductById(req.params.id)
     if (product) {
       res.json(product)
@@ -207,13 +251,14 @@ app.get('/api/products/:id', async (req, res) => {
     }
   } catch (error) {
     console.error('Error fetching product:', error)
-    res.status(500).json({ success: false, message: 'Error fetching product' })
+    res.status(500).json({ success: false, message: 'Error fetching product: ' + error.message })
   }
 })
 
 // Create product (Admin only)
 app.post('/api/admin/products', requireAuth, async (req, res) => {
   try {
+    await connectDB()
     const newProduct = await ProductsModel.createProduct(req.body)
     res.json({ success: true, product: newProduct })
   } catch (error) {
@@ -225,6 +270,7 @@ app.post('/api/admin/products', requireAuth, async (req, res) => {
 // Update product (Admin only)
 app.put('/api/admin/products/:id', requireAuth, async (req, res) => {
   try {
+    await connectDB()
     const updatedProduct = await ProductsModel.updateProduct(req.params.id, req.body)
     if (updatedProduct) {
       res.json({ success: true, product: updatedProduct })
@@ -240,6 +286,7 @@ app.put('/api/admin/products/:id', requireAuth, async (req, res) => {
 // Delete product (Admin only)
 app.delete('/api/admin/products/:id', requireAuth, async (req, res) => {
   try {
+    await connectDB()
     const deleted = await ProductsModel.deleteProduct(req.params.id)
     if (deleted) {
       res.json({ success: true, message: 'Product deleted successfully' })
@@ -248,7 +295,7 @@ app.delete('/api/admin/products/:id', requireAuth, async (req, res) => {
     }
   } catch (error) {
     console.error('Error deleting product:', error)
-    res.status(500).json({ success: false, message: 'Error deleting product' })
+    res.status(500).json({ success: false, message: 'Error deleting product: ' + error.message })
   }
 })
 
@@ -257,17 +304,19 @@ app.delete('/api/admin/products/:id', requireAuth, async (req, res) => {
 // Get all test reports
 app.get('/api/test-reports', async (req, res) => {
   try {
+    await connectDB()
     const reports = await TestReportsModel.getAllTestReports()
     res.json(reports || [])
   } catch (error) {
     console.error('Error fetching test reports:', error)
-    res.status(500).json({ success: false, message: 'Error fetching test reports' })
+    res.status(500).json({ success: false, message: 'Error fetching test reports: ' + error.message })
   }
 })
 
 // Get single test report
 app.get('/api/test-reports/:id', async (req, res) => {
   try {
+    await connectDB()
     const report = await TestReportsModel.getTestReportById(req.params.id)
     if (report) {
       res.json(report)
@@ -276,13 +325,14 @@ app.get('/api/test-reports/:id', async (req, res) => {
     }
   } catch (error) {
     console.error('Error fetching test report:', error)
-    res.status(500).json({ success: false, message: 'Error fetching test report' })
+    res.status(500).json({ success: false, message: 'Error fetching test report: ' + error.message })
   }
 })
 
 // Create test report (Admin only)
 app.post('/api/admin/test-reports', requireAuth, async (req, res) => {
   try {
+    await connectDB()
     const newReport = await TestReportsModel.createTestReport(req.body)
     res.json({ success: true, report: newReport })
   } catch (error) {
@@ -294,6 +344,7 @@ app.post('/api/admin/test-reports', requireAuth, async (req, res) => {
 // Update test report (Admin only)
 app.put('/api/admin/test-reports/:id', requireAuth, async (req, res) => {
   try {
+    await connectDB()
     const updatedReport = await TestReportsModel.updateTestReport(req.params.id, req.body)
     if (updatedReport) {
       res.json({ success: true, report: updatedReport })
@@ -309,6 +360,7 @@ app.put('/api/admin/test-reports/:id', requireAuth, async (req, res) => {
 // Delete test report (Admin only)
 app.delete('/api/admin/test-reports/:id', requireAuth, async (req, res) => {
   try {
+    await connectDB()
     const deleted = await TestReportsModel.deleteTestReport(req.params.id)
     if (deleted) {
       res.json({ success: true, message: 'Test report deleted successfully' })
@@ -317,39 +369,35 @@ app.delete('/api/admin/test-reports/:id', requireAuth, async (req, res) => {
     }
   } catch (error) {
     console.error('Error deleting test report:', error)
-    res.status(500).json({ success: false, message: 'Error deleting test report' })
+    res.status(500).json({ success: false, message: 'Error deleting test report: ' + error.message })
   }
 })
 
-// Health check endpoint
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', message: 'SVN Global API is running' })
-})
-
-// Serve static files from frontend dist in production
-// This handles SPA routing - all non-API routes serve index.html
-if (process.env.NODE_ENV === 'production') {
+// Serve static files from frontend dist in production (for traditional hosting, not Vercel)
+if (process.env.NODE_ENV === 'production' && !process.env.VERCEL) {
   const frontendPath = path.join(__dirname, '..', 'frontend', 'dist')
   
-  // Check if frontend dist exists
   if (fs.existsSync(frontendPath)) {
     app.use(express.static(frontendPath))
     
-    // Catch all handler: send back React's index.html file for SPA routing
     app.get('*', (req, res) => {
-      // Don't serve index.html for API routes
       if (req.path.startsWith('/api')) {
         return res.status(404).json({ error: 'API endpoint not found' })
       }
       res.sendFile(path.join(frontendPath, 'index.html'))
     })
-  } else {
-    console.warn('Frontend dist folder not found. Skipping static file serving.')
   }
 }
 
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`)
-  console.log(`Health check: http://localhost:${PORT}/api/health`)
-  console.log(`Admin panel: http://localhost:3003/admin`)
-})
+// Vercel serverless handler export
+export default app
+
+// For local development (non-serverless)
+if (!process.env.VERCEL) {
+  const PORT = process.env.PORT || 5000
+  app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`)
+    console.log(`Health check: http://localhost:${PORT}/api/health`)
+    console.log(`Admin panel: http://localhost:3003/admin`)
+  })
+}
