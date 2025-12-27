@@ -143,9 +143,9 @@ app.post('/api/admin/login', async (req, res) => {
     }
 
     req.session.isAuthenticated = true
-    req.session.username = username
+    req.session.username = admin.username // Use username from MongoDB
 
-    res.json({ success: true, message: 'Login successful' })
+    res.json({ success: true, message: 'Login successful', username: admin.username })
   } catch (error) {
     console.error('Login error:', error)
     res.status(500).json({ success: false, message: 'Server error: ' + error.message })
@@ -159,10 +159,28 @@ app.post('/api/admin/logout', (req, res) => {
 })
 
 // Check Auth Status
-app.get('/api/admin/check-auth', (req, res) => {
-  res.json({ 
-    isAuthenticated: req.session && req.session.isAuthenticated || false 
-  })
+app.get('/api/admin/check-auth', async (req, res) => {
+  try {
+    const isAuthenticated = req.session && req.session.isAuthenticated || false
+    let username = null
+    
+    if (isAuthenticated) {
+      // Get username from MongoDB to ensure it's always current
+      const admin = await getAdmin()
+      username = admin ? admin.username : req.session.username
+    }
+    
+    res.json({ 
+      isAuthenticated,
+      username
+    })
+  } catch (error) {
+    console.error('Error checking auth:', error)
+    res.json({ 
+      isAuthenticated: false,
+      username: null
+    })
+  }
 })
 
 // ============ PRODUCTS API ============
