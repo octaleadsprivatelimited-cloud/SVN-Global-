@@ -145,7 +145,13 @@ app.post('/api/admin/login', async (req, res) => {
 
     const admin = readJSON('admin.json')
 
-    if (!admin || username !== admin.username) {
+    if (!admin) {
+      console.error('Admin data not found')
+      return res.status(401).json({ success: false, message: 'Invalid credentials' })
+    }
+
+    if (username !== admin.username) {
+      console.log(`Username mismatch: provided=${username}, expected=${admin.username}`)
       return res.status(401).json({ success: false, message: 'Invalid credentials' })
     }
 
@@ -156,13 +162,18 @@ app.post('/api/admin/login', async (req, res) => {
       if (admin.password.startsWith('$2a$') || admin.password.startsWith('$2b$') || admin.password.startsWith('$2y$')) {
         // Hashed password - use bcrypt.compare
         isValidPassword = await bcrypt.compare(password, admin.password)
+        console.log(`Password check (hashed): ${isValidPassword}`)
       } else {
         // Plain text password (for backward compatibility during migration)
         isValidPassword = (password === admin.password)
+        console.log(`Password check (plain): ${isValidPassword}`)
       }
+    } else {
+      console.error('Admin password not found')
     }
 
     if (!isValidPassword) {
+      console.log('Login failed: Invalid password')
       return res.status(401).json({ success: false, message: 'Invalid credentials' })
     }
 
