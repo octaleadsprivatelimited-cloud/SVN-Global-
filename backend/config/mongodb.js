@@ -5,7 +5,8 @@ dotenv.config()
 
 // MongoDB Connection String
 // Format: mongodb+srv://username:password@cluster.mongodb.net/database?options
-// Password with @ symbol should be URL encoded as %40
+// Password: Svnglobal@2025 (URL encoded as %40 in connection string)
+// Replace <db_password> with actual password when setting MONGODB_URI environment variable
 const uri = process.env.MONGODB_URI || 'mongodb+srv://svnglobal:Svnglobal%402025@svnglobal.5vlys7w.mongodb.net/svnglobal?retryWrites=true&w=majority&appName=svnglobal'
 
 let client = null
