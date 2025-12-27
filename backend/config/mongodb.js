@@ -1,18 +1,18 @@
-import { MongoClient } from 'mongodb'
+import { MongoClient, ServerApiVersion } from 'mongodb'
 import dotenv from 'dotenv'
 
 dotenv.config()
 
 // MongoDB Connection String
-// MUST be provided via environment variables for security
-// Only uses MONGODB_URI (no fallbacks for production safety)
+// Priority: MONGODB_URI environment variable > fallback connection string
 // Format: mongodb+srv://username:password@cluster.mongodb.net/database?options
-const uri = process.env.MONGODB_URI
+// WARNING: Replace <db_password> with actual password in production!
+const uri = process.env.MONGODB_URI || "mongodb+srv://svnglobal:<db_password>@svnglobal.5vlys7w.mongodb.net/?appName=svnglobal"
 
-// Validate that connection string is provided
-if (!uri) {
+// Validate that connection string is provided and doesn't contain placeholder
+if (!uri || uri.includes('<db_password>')) {
   const error = new Error(
-    'MongoDB connection string is required. Please set MONGODB_URI environment variable.\n' +
+    'MongoDB connection string is required. Please set MONGODB_URI environment variable or replace <db_password> in the connection string.\n' +
     'Example: mongodb+srv://username:password@cluster.mongodb.net/database?options'
   )
   console.error('❌ FATAL ERROR:', error.message)
@@ -32,13 +32,25 @@ export const connectDB = async () => {
     }
 
     console.log('🔄 Creating new MongoDB connection...')
+    // Create a MongoClient with a MongoClientOptions object to set the Stable API version
     const client = new MongoClient(uri, {
+      serverApi: {
+        version: ServerApiVersion.v1,
+        strict: true,
+        deprecationErrors: true,
+      },
       maxPoolSize: 10, // Maintain up to 10 socket connections
       serverSelectionTimeoutMS: 5000, // Keep trying to send operations for 5 seconds
       socketTimeoutMS: 45000, // Close sockets after 45 seconds of inactivity
     })
 
+    // Connect the client to the server (optional starting in v4.7)
     await client.connect()
+    
+    // Send a ping to confirm a successful connection
+    await client.db('admin').command({ ping: 1 })
+    console.log('✅ Pinged your deployment. You successfully connected to MongoDB!')
+    
     const db = client.db('svnglobal')
 
     // Cache the connection for reuse in serverless environment
