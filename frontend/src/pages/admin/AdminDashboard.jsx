@@ -8,6 +8,7 @@ const AdminDashboard = () => {
   const navigate = useNavigate()
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [username, setUsername] = useState('')
   const [stats, setStats] = useState({
     products: 0,
     testReports: 0
@@ -28,6 +29,7 @@ const AdminDashboard = () => {
         navigate('/admin')
       } else {
         setIsAuthenticated(true)
+        setUsername(data.username || 'Admin')
       }
     } catch (error) {
       navigate('/admin')
@@ -88,6 +90,9 @@ const AdminDashboard = () => {
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">Admin Dashboard</h1>
                 <p className="text-sm text-gray-600">SVN Global Management Panel</p>
+                {username && (
+                  <p className="text-xs text-gray-500 mt-1">Logged in as: <span className="font-semibold text-royal-blue">{username}</span></p>
+                )}
               </div>
             </div>
             <div className="flex items-center space-x-4">
