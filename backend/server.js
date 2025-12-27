@@ -15,6 +15,7 @@ const app = express()
 // CORS configuration - allows requests from frontend
 // Support both development and production URLs
 const allowedOrigins = [
+  'https://svn-global.vercel.app', // Explicitly allow production frontend
   process.env.FRONTEND_URL,
   process.env.VITE_FRONTEND_URL,
   process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null,
