@@ -149,14 +149,17 @@ app.post('/api/admin/login', async (req, res) => {
       return res.status(401).json({ success: false, message: 'Invalid credentials' })
     }
 
-    // For initial setup, default password is 'admin123'
-    // In production, use bcrypt.compare(password, admin.password)
+    // Check password - support both hashed and plain text (for migration)
     let isValidPassword = false
-    if (password === 'admin123') {
-      isValidPassword = true
-    } else if (admin.password && admin.password.startsWith('$2b$')) {
-      // Hashed password
-      isValidPassword = await bcrypt.compare(password, admin.password)
+    if (admin.password) {
+      // Check if password is hashed (bcrypt hashes start with $2a$, $2b$, or $2y$)
+      if (admin.password.startsWith('$2a$') || admin.password.startsWith('$2b$') || admin.password.startsWith('$2y$')) {
+        // Hashed password - use bcrypt.compare
+        isValidPassword = await bcrypt.compare(password, admin.password)
+      } else {
+        // Plain text password (for backward compatibility during migration)
+        isValidPassword = (password === admin.password)
+      }
     }
 
     if (!isValidPassword) {
