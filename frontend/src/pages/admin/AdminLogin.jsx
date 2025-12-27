@@ -58,11 +58,7 @@ const AdminLogin = () => {
           // If response is not JSON, use default message
           if (response.status === 0 || response.status >= 500) {
             const apiEndpoint = getApiEndpoint('/api/admin/login')
-            if (import.meta.env.DEV) {
-              errorMessage = `Cannot connect to backend server. Make sure it's running at http://localhost:5000. Attempted: ${apiEndpoint}`
-            } else {
-              errorMessage = `Cannot connect to backend server. Attempted: ${apiEndpoint}. Please check: 1) Backend is deployed, 2) VITE_API_URL is set if backend is on different domain, 3) CORS is configured.`
-            }
+            errorMessage = `Cannot connect to backend server. Attempted: ${apiEndpoint}. Please check: 1) Backend is deployed, 2) VITE_API_URL is set if backend is on different domain, 3) CORS is configured.`
           }
         }
         setError(errorMessage)
@@ -80,12 +76,7 @@ const AdminLogin = () => {
     } catch (error) {
       console.error('Login error:', error)
       const apiEndpoint = getApiEndpoint('/api/admin/login')
-      
-      if (import.meta.env.DEV) {
-        setError(`Cannot connect to backend server. Make sure it's running at http://localhost:5000. Attempted: ${apiEndpoint}`)
-      } else {
-        setError(`Cannot connect to backend server. Attempted: ${apiEndpoint}. Please ensure: 1) Backend is deployed and running, 2) VITE_API_URL is set correctly if backend is on a different domain, 3) CORS is configured properly. Check browser console for more details.`)
-      }
+      setError(`Cannot connect to backend server. Attempted: ${apiEndpoint}. Please ensure: 1) Backend is deployed and running, 2) VITE_API_URL is set correctly if backend is on a different domain, 3) CORS is configured properly. Check browser console for more details.`)
     } finally {
       setLoading(false)
     }
@@ -161,11 +152,6 @@ const AdminLogin = () => {
 
           <div className="mt-6 text-center text-sm text-gray-500">
             <p>Default credentials: admin / admin123</p>
-            {import.meta.env.DEV && (
-              <p className="mt-2 text-xs text-gray-400">
-                Make sure the backend server is running on http://localhost:5000
-              </p>
-            )}
           </div>
         </div>
       </motion.div>

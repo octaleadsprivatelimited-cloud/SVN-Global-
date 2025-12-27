@@ -15,8 +15,6 @@ const app = express()
 // CORS configuration - allows requests from frontend
 // Support both development and production URLs
 const allowedOrigins = [
-  'http://localhost:3003',
-  'http://localhost:5173',
   process.env.FRONTEND_URL,
   process.env.VITE_FRONTEND_URL,
   process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null,
@@ -24,6 +22,12 @@ const allowedOrigins = [
   // Allow any Vercel deployment
   /\.vercel\.app$/.test(process.env.VERCEL_URL || '') ? `https://${process.env.VERCEL_URL}` : null,
 ].filter(Boolean)
+
+// In development, allow localhost origins dynamically
+if (process.env.NODE_ENV !== 'production') {
+  // Allow common development ports
+  allowedOrigins.push(/^http:\/\/localhost:\d+$/)
+}
 
 app.use(cors({
   origin: function (origin, callback) {
@@ -383,9 +387,13 @@ export default app
 // For local development only (NOT in Vercel production)
 if (!process.env.VERCEL && process.env.NODE_ENV !== 'production') {
   const PORT = process.env.PORT || 5000
+  const FRONTEND_URL = process.env.FRONTEND_URL || process.env.VITE_FRONTEND_URL
   app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`)
-    console.log(`Health check: http://localhost:${PORT}/api/health`)
-    console.log(`Admin panel: http://localhost:3003/admin`)
+    const baseUrl = `http://localhost:${PORT}`
+    console.log(`Health check: ${baseUrl}/api/health`)
+    if (FRONTEND_URL) {
+      console.log(`Admin panel: ${FRONTEND_URL}/admin`)
+    }
   })
 }
