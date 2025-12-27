@@ -373,21 +373,8 @@ app.delete('/api/admin/test-reports/:id', requireAuth, async (req, res) => {
   }
 })
 
-// Serve static files from frontend dist in production (for traditional hosting, not Vercel)
-if (process.env.NODE_ENV === 'production' && !process.env.VERCEL) {
-  const frontendPath = path.join(__dirname, '..', 'frontend', 'dist')
-  
-  if (fs.existsSync(frontendPath)) {
-    app.use(express.static(frontendPath))
-    
-    app.get('*', (req, res) => {
-      if (req.path.startsWith('/api')) {
-        return res.status(404).json({ error: 'API endpoint not found' })
-      }
-      res.sendFile(path.join(frontendPath, 'index.html'))
-    })
-  }
-}
+// API routes should be handled before any catch-all
+// Don't serve static files in Vercel - frontend is separate deployment
 
 // Vercel serverless handler export
 export default app
