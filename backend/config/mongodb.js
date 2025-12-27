@@ -44,6 +44,18 @@ export const connectDB = async () => {
       socketTimeoutMS: 45000, // Close sockets after 45 seconds of inactivity
     })
 
+    // Attach database pool for Vercel serverless optimization (if available)
+    if (process.env.VERCEL) {
+      try {
+        const { attachDatabasePool } = await import('@vercel/functions')
+        attachDatabasePool(client)
+        console.log('✅ Attached database pool for Vercel serverless optimization')
+      } catch (error) {
+        // @vercel/functions not available, continue without it
+        console.warn('⚠️  @vercel/functions not available, continuing without database pool attachment')
+      }
+    }
+
     // Connect the client to the server (optional starting in v4.7)
     await client.connect()
     
