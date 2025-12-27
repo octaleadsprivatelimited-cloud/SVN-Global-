@@ -3,7 +3,10 @@ import dotenv from 'dotenv'
 
 dotenv.config()
 
-const uri = process.env.MONGODB_URI || 'mongodb+srv://svnglobal:Svnglobal%402025@svnglobal.5vlys7w.mongodb.net/?appName=svnglobal'
+// MongoDB Connection String
+// Format: mongodb+srv://username:password@cluster.mongodb.net/database?options
+// Password with @ symbol should be URL encoded as %40
+const uri = process.env.MONGODB_URI || 'mongodb+srv://svnglobal:Svnglobal%402025@svnglobal.5vlys7w.mongodb.net/svnglobal?retryWrites=true&w=majority&appName=svnglobal'
 
 let client = null
 let db = null
