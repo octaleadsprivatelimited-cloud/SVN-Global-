@@ -1,0 +1,63 @@
+[
+  {
+    "id": 1,
+    "title": "Quartz Test Report June 2025",
+    "category": "Quartz",
+    "date": "June 2025",
+    "description": "NABL Accredited test report for quartz lumps with comprehensive chemical analysis and quality parameters.",
+    "file": "/Quartz_Test_Report_June_2025.pdf",
+    "certifications": ["NABL Accredited", "ISO Certified"],
+    "parameters": ["Chemical Analysis", "Physical Properties", "Quality Standards"]
+  },
+  {
+    "id": 2,
+    "title": "Mica Covers Quality Report - May 2025",
+    "category": "Mica",
+    "date": "May 2025",
+    "description": "Complete quality assurance report for electrical grade mica covers including dielectric strength and thermal properties.",
+    "file": "/Quartz_Test_Report_June_2025.pdf",
+    "certifications": ["ISO 9001", "IEC Standards", "RoHS Compliant"],
+    "parameters": ["Dielectric Strength", "Thermal Resistance", "Chemical Composition"]
+  },
+  {
+    "id": 3,
+    "title": "Mica Sheets Export Certification - April 2025",
+    "category": "Mica",
+    "date": "April 2025",
+    "description": "Export certification and quality test report for mica sheets meeting international export standards.",
+    "file": "/Quartz_Test_Report_June_2025.pdf",
+    "certifications": ["NABL Accredited", "Export Certified"],
+    "parameters": ["Export Compliance", "Quality Standards", "Safety Parameters"]
+  },
+  {
+    "id": 4,
+    "title": "Thermal Mica Products Test - March 2025",
+    "category": "Mica",
+    "date": "March 2025",
+    "description": "Comprehensive testing report for thermal insulation mica products with detailed thermal conductivity analysis.",
+    "file": "/Quartz_Test_Report_June_2025.pdf",
+    "certifications": ["ISO Certified", "NABL Accredited"],
+    "parameters": ["Thermal Conductivity", "Insulation Properties", "Temperature Resistance"]
+  },
+  {
+    "id": 5,
+    "title": "Electrical Grade Mica - February 2025",
+    "category": "Mica",
+    "date": "February 2025",
+    "description": "Quality test report for electrical grade mica covers with dielectric and electrical insulation properties.",
+    "file": "/Quartz_Test_Report_June_2025.pdf",
+    "certifications": ["IEC Standards", "RoHS Compliant", "ISO 9001"],
+    "parameters": ["Dielectric Properties", "Electrical Insulation", "Quality Metrics"]
+  },
+  {
+    "id": 6,
+    "title": "Custom Mica Components - January 2025",
+    "category": "Mica",
+    "date": "January 2025",
+    "description": "Test report for custom-manufactured mica components with specific client requirements and quality validation.",
+    "file": "/Quartz_Test_Report_June_2025.pdf",
+    "certifications": ["Custom Certified", "NABL Accredited"],
+    "parameters": ["Custom Specifications", "Quality Validation", "Compliance Testing"]
+  }
+]
+

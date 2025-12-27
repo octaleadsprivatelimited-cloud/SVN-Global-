@@ -1,0 +1,108 @@
+[
+  {
+    "id": 1,
+    "icon": "Layers",
+    "title": "Mica Flakes",
+    "description": "Premium quality mica flakes used in various industrial applications including paints, plastics, rubber, and construction materials. Our mica flakes are processed to meet international quality standards.",
+    "image": "/mica-flakes.jpg",
+    "features": [
+      "High purity and quality",
+      "Various size grades available",
+      "Excellent thermal resistance",
+      "Chemical inertness",
+      "Wide industrial applications"
+    ],
+    "applications": [
+      "Paints & Coatings",
+      "Plastics Industry",
+      "Rubber Manufacturing",
+      "Construction Materials"
+    ],
+    "testReport": "/Quartz_Test_Report_June_2025.pdf"
+  },
+  {
+    "id": 2,
+    "icon": "Package",
+    "title": "Mica Powder",
+    "description": "Fine-grade mica powder manufactured with precision for use in cosmetics, paints, plastics, and electrical insulation. Available in multiple mesh sizes to meet specific requirements.",
+    "image": "/mica-powder.jpg",
+    "features": [
+      "Ultra-fine particle size",
+      "Consistent quality",
+      "Multiple mesh sizes",
+      "Cosmetic grade available",
+      "Industrial grade options"
+    ],
+    "applications": [
+      "Cosmetics",
+      "Paints & Varnishes",
+      "Plastic Industry",
+      "Electrical Insulation"
+    ],
+    "testReport": "/Quartz_Test_Report_June_2025.pdf"
+  },
+  {
+    "id": 3,
+    "icon": "Box",
+    "title": "Split Mica",
+    "description": "High-quality split mica sheets perfect for electrical insulation, thermal applications, and industrial uses. Our split mica is processed from premium mica blocks ensuring superior quality.",
+    "image": "/mica-biotite.jpg",
+    "features": [
+      "Excellent dielectric properties",
+      "High temperature resistance",
+      "Uniform thickness",
+      "Custom sizes available",
+      "Export quality standards"
+    ],
+    "applications": [
+      "Electrical Insulation",
+      "Thermal Applications",
+      "Industrial Equipment",
+      "Export Markets"
+    ],
+    "testReport": "/Quartz_Test_Report_June_2025.pdf"
+  },
+  {
+    "id": 4,
+    "icon": "Scissors",
+    "title": "Mica Scrap",
+    "description": "Quality mica scrap suitable for various industrial applications. Processed and graded to meet customer specifications for use in manufacturing and production processes.",
+    "image": "/mica-flakes.jpg",
+    "features": [
+      "Cost-effective solution",
+      "Multiple grades available",
+      "Quality processed",
+      "Bulk quantities",
+      "Export ready"
+    ],
+    "applications": [
+      "Manufacturing",
+      "Production Processes",
+      "Industrial Applications",
+      "Bulk Export"
+    ],
+    "testReport": "/Quartz_Test_Report_June_2025.pdf"
+  },
+  {
+    "id": 5,
+    "icon": "Boxes",
+    "title": "Mica Block",
+    "description": "Premium mica blocks sourced from quality mines and processed to meet international standards. Used as raw material for manufacturing various mica products and components.",
+    "image": "/mica-blocks.jpg",
+    "features": [
+      "Premium quality raw material",
+      "Consistent block size",
+      "High mica content",
+      "Export certified",
+      "Bulk supply available"
+    ],
+    "applications": [
+      "Raw Material Supply",
+      "Manufacturing Base",
+      "Export Markets",
+      "Industrial Processing"
+    ],
+    "testReport": "/Quartz_Test_Report_June_2025.pdf"
+  }
+]
+
