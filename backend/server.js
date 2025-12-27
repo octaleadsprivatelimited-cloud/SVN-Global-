@@ -1,9 +1,6 @@
 import express from 'express'
 import cors from 'cors'
 import dotenv from 'dotenv'
-import fs from 'fs'
-import path from 'path'
-import { fileURLToPath } from 'url'
 import bcrypt from 'bcryptjs'
 import cookieSession from 'cookie-session'
 import { connectDB } from './config/mongodb.js'
@@ -12,9 +9,6 @@ import * as TestReportsModel from './models/testReports.js'
 import { getAdmin, verifyAdminPassword } from './models/admin.js'
 
 dotenv.config()
-
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
 
 const app = express()
 
@@ -27,6 +21,8 @@ const allowedOrigins = [
   process.env.VITE_FRONTEND_URL,
   process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null,
   process.env.NEXT_PUBLIC_VERCEL_URL ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}` : null,
+  // Allow any Vercel deployment
+  /\.vercel\.app$/.test(process.env.VERCEL_URL || '') ? `https://${process.env.VERCEL_URL}` : null,
 ].filter(Boolean)
 
 app.use(cors({
@@ -39,12 +35,16 @@ app.use(cors({
       return callback(null, true)
     }
     
-    // In production, check allowed origins
-    if (allowedOrigins.length > 0 && allowedOrigins.some(allowed => origin.includes(allowed.replace('https://', '').replace('http://', '')))) {
-      callback(null, true)
-    } else if (allowedOrigins.length === 0) {
-      // If no specific origins set, allow all (for testing)
-      console.log(`CORS: Allowing request from origin: ${origin}`)
+    // In production, check allowed origins or allow Vercel domains
+    const isVercelDomain = origin.includes('.vercel.app') || origin.includes('vercel.app')
+    const isAllowedOrigin = allowedOrigins.length > 0 && allowedOrigins.some(allowed => {
+      if (typeof allowed === 'string') {
+        return origin.includes(allowed.replace('https://', '').replace('http://', ''))
+      }
+      return false
+    })
+    
+    if (isVercelDomain || isAllowedOrigin || allowedOrigins.length === 0) {
       callback(null, true)
     } else {
       console.log(`CORS: Rejecting request from origin: ${origin}`)
@@ -89,19 +89,23 @@ app.get('/api/health', async (req, res) => {
   try {
     // Test MongoDB connection
     await connectDB()
-    res.json({ 
+    res.setHeader('Content-Type', 'application/json')
+    res.status(200).json({ 
       status: 'ok', 
       message: 'SVN Global API is running',
       mongodb: 'connected',
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      environment: process.env.NODE_ENV || 'development'
     })
   } catch (error) {
+    res.setHeader('Content-Type', 'application/json')
     res.status(503).json({ 
       status: 'error', 
       message: 'SVN Global API is running but MongoDB connection failed',
       mongodb: 'disconnected',
       error: error.message,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      environment: process.env.NODE_ENV || 'development'
     })
   }
 })
@@ -373,14 +377,11 @@ app.delete('/api/admin/test-reports/:id', requireAuth, async (req, res) => {
   }
 })
 
-// API routes should be handled before any catch-all
-// Don't serve static files in Vercel - frontend is separate deployment
-
-// Vercel serverless handler export
+// Vercel serverless handler export - MUST be default export
 export default app
 
-// For local development (non-serverless)
-if (!process.env.VERCEL) {
+// For local development only (NOT in Vercel production)
+if (!process.env.VERCEL && process.env.NODE_ENV !== 'production') {
   const PORT = process.env.PORT || 5000
   app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`)

@@ -4,10 +4,10 @@ import dotenv from 'dotenv'
 dotenv.config()
 
 // MongoDB Connection String
-// Use MONGODB_URI environment variable in production (Vercel)
+// Priority: MONGO_URI > MONGODB_URI > fallback
 // Format: mongodb+srv://username:password@cluster.mongodb.net/database?options
 // Password: Svnglobal@2025 (URL encoded as %40 in connection string)
-const uri = process.env.MONGODB_URI || process.env.MONGO_URI || 'mongodb+srv://svnglobal:Svnglobal%402025@svnglobal.5vlys7w.mongodb.net/svnglobal?retryWrites=true&w=majority&appName=svnglobal'
+const uri = process.env.MONGO_URI || process.env.MONGODB_URI || 'mongodb+srv://svnglobal:Svnglobal%402025@svnglobal.5vlys7w.mongodb.net/svnglobal?retryWrites=true&w=majority&appName=svnglobal'
 
 // Global connection for serverless (Vercel reuses connections)
 let cachedClient = null
@@ -22,7 +22,7 @@ export const connectDB = async () => {
     }
 
     if (!uri) {
-      throw new Error('MONGODB_URI or MONGO_URI environment variable is not set')
+      throw new Error('MONGO_URI or MONGODB_URI environment variable is not set')
     }
 
     console.log('🔄 Creating new MongoDB connection...')
@@ -46,7 +46,7 @@ export const connectDB = async () => {
   } catch (error) {
     console.error('❌ MongoDB connection error:', error.message)
     console.error('Please check:')
-    console.error('  1. MONGODB_URI or MONGO_URI environment variable is set')
+    console.error('  1. MONGO_URI or MONGODB_URI environment variable is set')
     console.error('  2. MongoDB Atlas cluster is running')
     console.error('  3. Network access is allowed for your IP (or 0.0.0.0/0 for all)')
     console.error('  4. Username and password are correct')
