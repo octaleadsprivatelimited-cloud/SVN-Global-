@@ -19,7 +19,44 @@ if (!uri || uri.includes('<db_password>')) {
   throw error
 }
 
-// Global connection for serverless (Vercel reuses connections)
+// Module-scoped MongoClient options for Vercel optimization
+const options = {
+  serverApi: {
+    version: ServerApiVersion.v1,
+    strict: true,
+    deprecationErrors: true,
+  },
+  appName: "svn-global-app",
+  maxIdleTimeMS: 5000,
+  maxPoolSize: 10, // Maintain up to 10 socket connections
+  serverSelectionTimeoutMS: 5000, // Keep trying to send operations for 5 seconds
+  socketTimeoutMS: 45000, // Close sockets after 45 seconds of inactivity
+}
+
+// Create module-scoped MongoClient to ensure the client can be shared across functions
+const client = new MongoClient(uri, options)
+
+// Attach the client to ensure proper cleanup on function suspension (Vercel optimization)
+// This will be called when connectDB is first invoked
+let poolAttached = false
+const attachPoolIfNeeded = async () => {
+  if (process.env.VERCEL && !poolAttached) {
+    try {
+      const { attachDatabasePool } = await import('@vercel/functions')
+      attachDatabasePool(client)
+      poolAttached = true
+      console.log('✅ Attached database pool for Vercel serverless optimization')
+    } catch (error) {
+      // @vercel/functions not available, continue without it
+      console.warn('⚠️  @vercel/functions not available, continuing without database pool attachment')
+    }
+  }
+}
+
+// Export the module-scoped client
+export default client
+
+// Global connection cache for backward compatibility
 let cachedClient = null
 let cachedDb = null
 
@@ -32,29 +69,9 @@ export const connectDB = async () => {
     }
 
     console.log('🔄 Creating new MongoDB connection...')
-    // Create a MongoClient with a MongoClientOptions object to set the Stable API version
-    const client = new MongoClient(uri, {
-      serverApi: {
-        version: ServerApiVersion.v1,
-        strict: true,
-        deprecationErrors: true,
-      },
-      maxPoolSize: 10, // Maintain up to 10 socket connections
-      serverSelectionTimeoutMS: 5000, // Keep trying to send operations for 5 seconds
-      socketTimeoutMS: 45000, // Close sockets after 45 seconds of inactivity
-    })
-
-    // Attach database pool for Vercel serverless optimization (if available)
-    if (process.env.VERCEL) {
-      try {
-        const { attachDatabasePool } = await import('@vercel/functions')
-        attachDatabasePool(client)
-        console.log('✅ Attached database pool for Vercel serverless optimization')
-      } catch (error) {
-        // @vercel/functions not available, continue without it
-        console.warn('⚠️  @vercel/functions not available, continuing without database pool attachment')
-      }
-    }
+    
+    // Attach database pool for Vercel serverless optimization (if needed)
+    await attachPoolIfNeeded()
 
     // Connect the client to the server (optional starting in v4.7)
     await client.connect()
