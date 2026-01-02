@@ -1,13 +1,14 @@
 import { getDB } from '../config/mongodb.js'
 import bcrypt from 'bcryptjs'
 
-export const getAdminCollection = () => {
-  return getDB().collection('admin')
+export const getAdminCollection = async () => {
+  const db = await getDB()
+  return db.collection('admin')
 }
 
 export const getAdmin = async () => {
   try {
-    const collection = getAdminCollection()
+    const collection = await getAdminCollection()
     const admin = await collection.findOne({})
     return admin
   } catch (error) {
@@ -18,7 +19,7 @@ export const getAdmin = async () => {
 
 export const createOrUpdateAdmin = async (username, password) => {
   try {
-    const collection = getAdminCollection()
+    const collection = await getAdminCollection()
     const hashedPassword = await bcrypt.hash(password, 10)
     
     const admin = await collection.findOneAndUpdate(

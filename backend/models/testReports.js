@@ -1,13 +1,14 @@
 import { getDB } from '../config/mongodb.js'
 import { MongoClient, ObjectId } from 'mongodb'
 
-export const getTestReportsCollection = () => {
-  return getDB().collection('testReports')
+export const getTestReportsCollection = async () => {
+  const db = await getDB()
+  return db.collection('testReports')
 }
 
 export const getAllTestReports = async () => {
   try {
-    const collection = getTestReportsCollection()
+    const collection = await getTestReportsCollection()
     const reports = await collection.find({}).sort({ date: -1 }).toArray()
     // Convert _id to id for compatibility
     return reports.map(report => ({
@@ -22,7 +23,7 @@ export const getAllTestReports = async () => {
 
 export const getTestReportById = async (id) => {
   try {
-    const collection = getTestReportsCollection()
+    const collection = await getTestReportsCollection()
     const report = await collection.findOne({ _id: new ObjectId(id) })
     if (report) {
       return {
@@ -39,7 +40,7 @@ export const getTestReportById = async (id) => {
 
 export const createTestReport = async (reportData) => {
   try {
-    const collection = getTestReportsCollection()
+    const collection = await getTestReportsCollection()
     // Remove id if it exists (MongoDB will create _id)
     const { id, ...dataToInsert } = reportData
     const result = await collection.insertOne(dataToInsert)
@@ -56,7 +57,7 @@ export const createTestReport = async (reportData) => {
 
 export const updateTestReport = async (id, reportData) => {
   try {
-    const collection = getTestReportsCollection()
+    const collection = await getTestReportsCollection()
     // Remove id from update data
     const { id: _, ...updateData } = reportData
     const result = await collection.findOneAndUpdate(
@@ -79,7 +80,7 @@ export const updateTestReport = async (id, reportData) => {
 
 export const deleteTestReport = async (id) => {
   try {
-    const collection = getTestReportsCollection()
+    const collection = await getTestReportsCollection()
     const result = await collection.deleteOne({ _id: new ObjectId(id) })
     return result.deletedCount > 0
   } catch (error) {

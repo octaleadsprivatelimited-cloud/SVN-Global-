@@ -89,6 +89,28 @@ const requireAuth = (req, res, next) => {
   }
 }
 
+// Root endpoint
+app.get('/', (req, res) => {
+  res.json({
+    message: 'SVN Global API Server',
+    version: '1.0.0',
+    endpoints: {
+      health: '/api/health',
+      products: '/api/products',
+      testReports: '/api/test-reports',
+      contact: 'POST /api/contact',
+      admin: {
+        login: 'POST /api/admin/login',
+        logout: 'POST /api/admin/logout',
+        checkAuth: 'GET /api/admin/check-auth',
+        products: '/api/admin/products',
+        testReports: '/api/admin/test-reports'
+      }
+    },
+    documentation: 'Visit /api/health for server status'
+  })
+})
+
 // Health check endpoint (useful for Vercel)
 app.get('/api/health', async (req, res) => {
   try {
