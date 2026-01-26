@@ -18,29 +18,72 @@ const firebaseConfig = {
 };
 
 // Validate that all required Firebase config values are present
-if (!firebaseConfig.apiKey || !firebaseConfig.authDomain || !firebaseConfig.projectId) {
-  console.error('❌ Firebase configuration is missing required environment variables. Please check your .env.development file.');
-  throw new Error('Firebase configuration is incomplete. Please set all VITE_FIREBASE_* environment variables in .env.development.');
-}
+const hasValidConfig = firebaseConfig.apiKey && 
+                       firebaseConfig.authDomain && 
+                       firebaseConfig.projectId &&
+                       firebaseConfig.apiKey !== 'undefined' &&
+                       firebaseConfig.authDomain !== 'undefined' &&
+                       firebaseConfig.projectId !== 'undefined';
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-
-// Initialize Firestore
-export const db = getFirestore(app);
-
-// Initialize Auth
-export const auth = getAuth(app);
-
-// Initialize Analytics (only in browser environment)
-let analytics = null;
-if (typeof window !== 'undefined') {
-  try {
-    analytics = getAnalytics(app);
-  } catch (error) {
-    console.warn('Analytics initialization failed:', error);
+if (!hasValidConfig) {
+  console.error('❌ Firebase configuration is missing required environment variables.');
+  console.error('Missing values:', {
+    apiKey: !firebaseConfig.apiKey || firebaseConfig.apiKey === 'undefined',
+    authDomain: !firebaseConfig.authDomain || firebaseConfig.authDomain === 'undefined',
+    projectId: !firebaseConfig.projectId || firebaseConfig.projectId === 'undefined'
+  });
+  
+  // In production, show a warning but don't crash - allow app to load
+  if (import.meta.env.PROD) {
+    console.warn('⚠️  Firebase not configured - some features may not work. Please set VITE_FIREBASE_* environment variables in Vercel.');
+    console.warn('⚠️  App will continue to load but Firebase features will be disabled.');
+  } else {
+    // In development, throw to catch issues early
+    throw new Error('Firebase configuration is incomplete. Please set all VITE_FIREBASE_* environment variables in .env.development.');
   }
 }
 
-export { app, analytics };
+// Initialize Firebase
+let app;
+let db;
+let auth;
+let analytics = null;
+
+try {
+  if (hasValidConfig) {
+    app = initializeApp(firebaseConfig);
+    db = getFirestore(app);
+    auth = getAuth(app);
+    
+    // Initialize Analytics (only in browser environment)
+    if (typeof window !== 'undefined') {
+      try {
+        analytics = getAnalytics(app);
+      } catch (error) {
+        console.warn('Analytics initialization failed:', error);
+      }
+    }
+    console.log('✅ Firebase initialized successfully');
+  } else {
+    console.warn('⚠️  Firebase not initialized - using fallback values');
+    // Create minimal fallback to prevent crashes
+    app = null;
+    db = null;
+    auth = null;
+  }
+} catch (error) {
+  console.error('❌ Firebase initialization failed:', error);
+  // In production, don't crash the app
+  if (import.meta.env.PROD) {
+    console.warn('⚠️  Continuing without Firebase - some features will be disabled.');
+    app = null;
+    db = null;
+    auth = null;
+  } else {
+    throw error;
+  }
+}
+
+// Export Firebase instances (may be null if not configured)
+export { db, auth, app, analytics };
 export default app;
