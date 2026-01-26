@@ -1,8 +1,12 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { FileText, Plus, Edit, Trash2, ArrowLeft, Save, X } from 'lucide-react'
+import { FileText, Plus, Edit, Trash2, ArrowLeft, Save, X, Loader2 } from 'lucide-react'
 import { getApiEndpoint } from '../../config/api'
+import { auth } from '../../config/firebase'
+import { onAuthStateChanged } from 'firebase/auth'
+import { compressPDF } from '../../utils/pdfCompression'
+import { imageToBase64, getImageDataURL } from '../../utils/imageToBase64'
 
 const TestReportManagement = () => {
   const navigate = useNavigate()
@@ -22,24 +26,25 @@ const TestReportManagement = () => {
   const [newCertification, setNewCertification] = useState('')
   const [newParameter, setNewParameter] = useState('')
   const [file, setFile] = useState(null)
+  const [compressedPDFBase64, setCompressedPDFBase64] = useState(null) // Store compressed base64 immediately
+  const [uploading, setUploading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState('')
 
   useEffect(() => {
-    checkAuth()
+    const unsubscribe = checkAuth()
     fetchReports()
+    return () => {
+      if (unsubscribe) unsubscribe()
+    }
   }, [])
 
-  const checkAuth = async () => {
-    try {
-      const response = await fetch(getApiEndpoint('/api/admin/check-auth'), {
-        credentials: 'include'
-      })
-      const data = await response.json()
-      if (!data.isAuthenticated) {
+  const checkAuth = () => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (!user) {
         navigate('/admin')
       }
-    } catch (error) {
-      navigate('/admin')
-    }
+    })
+    return unsubscribe
   }
 
   const fetchReports = async () => {
@@ -58,8 +63,18 @@ const TestReportManagement = () => {
     if (!window.confirm('Are you sure you want to delete this test report?')) return
 
     try {
+      const user = auth.currentUser
+      if (!user) {
+        throw new Error('User not authenticated')
+      }
+      
+      const idToken = await user.getIdToken()
+      
       const response = await fetch(getApiEndpoint(`/api/admin/test-reports/${id}`), {
         method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${idToken}`
+        },
         credentials: 'include'
       })
       const data = await response.json()
@@ -78,11 +93,13 @@ const TestReportManagement = () => {
       category: report.category,
       date: report.date,
       description: report.description,
-      file: report.file,
+      file: report.file, // This will be base64 string from Firestore
       certifications: [...report.certifications],
       parameters: [...report.parameters]
     })
     setFile(null)
+    setCompressedPDFBase64(null)
+    setUploadProgress('')
     setShowForm(true)
   }
 
@@ -98,65 +115,105 @@ const TestReportManagement = () => {
       parameters: []
     })
     setFile(null)
+    setCompressedPDFBase64(null)
+    setUploadProgress('')
     setShowForm(true)
   }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    setUploading(true)
+    setUploadProgress('')
+    
     try {
+      const user = auth.currentUser
+      if (!user) {
+        throw new Error('User not authenticated')
+      }
+      
+      const idToken = await user.getIdToken()
+      
+      // Use pre-compressed base64 if available, otherwise use existing file
+      let fileURL = compressedPDFBase64 || formData.file
+      
       const url = editingReport
         ? getApiEndpoint(`/api/admin/test-reports/${editingReport}`)
         : getApiEndpoint('/api/admin/test-reports')
       
       const method = editingReport ? 'PUT' : 'POST'
       
-      // Create FormData for file upload
-      const formDataToSend = new FormData()
-      
-      // Add file if selected
-      if (file) {
-        formDataToSend.append('file', file)
-      }
-      
-      // Add other form data as JSON string
       const dataToSend = {
         title: formData.title,
         category: formData.category,
         date: formData.date,
         description: formData.description,
         certifications: formData.certifications,
-        parameters: formData.parameters
+        parameters: formData.parameters,
+        file: fileURL
       }
-      
-      // If editing and no new file, keep existing file URL
-      if (editingReport && !file) {
-        dataToSend.file = formData.file
-      }
-      
-      formDataToSend.append('data', JSON.stringify(dataToSend))
       
       const response = await fetch(url, {
         method,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${idToken}`
+        },
         credentials: 'include',
-        body: formDataToSend
+        body: JSON.stringify(dataToSend)
       })
 
       const data = await response.json()
       if (data.success) {
         setShowForm(false)
         setFile(null)
+        setCompressedPDFBase64(null)
+        setUploadProgress('')
         fetchReports()
+      } else {
+        throw new Error(data.message || 'Failed to save report')
       }
     } catch (error) {
       console.error('Error saving report:', error)
       alert('Error saving report: ' + error.message)
+    } finally {
+      setUploading(false)
+      // Don't clear progress immediately - let user see it
+      setTimeout(() => setUploadProgress(''), 2000)
     }
   }
   
-  const handleFileChange = (e) => {
+  const handleFileChange = async (e) => {
     const selectedFile = e.target.files[0]
     if (selectedFile) {
       setFile(selectedFile)
+      setUploadProgress('Compressing PDF to 12KB...')
+      
+      try {
+        const startTime = Date.now()
+        const originalSize = (selectedFile.size / 1024).toFixed(2)
+        
+        // Compress immediately to 12KB
+        const compressedFile = await compressPDF(selectedFile, 12)
+        const compressionTime = ((Date.now() - startTime) / 1000).toFixed(1)
+        const compressedSize = (compressedFile.size / 1024).toFixed(2)
+        
+        setUploadProgress(`Compressed to ${compressedSize}KB (${compressionTime}s). Converting to base64...`)
+        
+        // Convert to base64 immediately
+        const base64String = await imageToBase64(compressedFile)
+        setCompressedPDFBase64(base64String)
+        
+        const totalTime = ((Date.now() - startTime) / 1000).toFixed(1)
+        setUploadProgress(`✓ Ready! (${compressedSize}KB in ${totalTime}s)`)
+        
+        console.log(`PDF compressed: ${originalSize}KB → ${compressedSize}KB in ${totalTime}s`)
+      } catch (error) {
+        console.error('Error compressing PDF:', error)
+        setUploadProgress('Compression error - will use original file')
+        // Fallback: convert original to base64
+        const base64String = await imageToBase64(selectedFile)
+        setCompressedPDFBase64(base64String)
+      }
     }
   }
 
@@ -199,29 +256,35 @@ const TestReportManagement = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 pt-20">
-      <div className="container mx-auto px-6 py-8">
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center space-x-4">
-            <Link
-              to="/admin/dashboard"
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </Link>
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">Test Report Management</h1>
-              <p className="text-gray-600">Manage test reports and certifications</p>
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-40">
+        <div className="container mx-auto px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <Link
+                to="/admin/dashboard"
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <ArrowLeft className="w-5 h-5" />
+              </Link>
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900">Test Report Management</h1>
+                <p className="text-sm text-gray-600">Manage test reports and certifications</p>
+              </div>
             </div>
+            <button
+              onClick={handleAdd}
+              className="flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-metallic-gold to-yellow-600 text-white rounded-lg font-semibold hover:shadow-lg transition-all"
+            >
+              <Plus className="w-5 h-5" />
+              <span>Add Report</span>
+            </button>
           </div>
-          <button
-            onClick={handleAdd}
-            className="flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-metallic-gold to-yellow-600 text-white rounded-lg font-semibold hover:shadow-lg transition-all"
-          >
-            <Plus className="w-5 h-5" />
-            <span>Add Report</span>
-          </button>
         </div>
+      </header>
+
+      <div className="container mx-auto px-6 py-8">
 
         {showForm && (
           <motion.div
@@ -289,12 +352,22 @@ const TestReportManagement = () => {
                   onChange={handleFileChange}
                   className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-metallic-gold"
                   required={!editingReport || !formData.file}
+                  disabled={uploading}
                 />
                 {file && (
-                  <p className="text-sm text-green-600 mt-1">✓ {file.name} selected</p>
+                  <div className="mt-2">
+                    <p className="text-sm text-green-600">✓ {file.name} selected</p>
+                    <p className="text-xs text-gray-500">Size: {(file.size / 1024).toFixed(2)}KB (will be compressed to ~12KB)</p>
+                  </div>
                 )}
                 {!file && formData.file && (
-                  <p className="text-sm text-gray-500 mt-1">Current: {formData.file} (upload new to replace)</p>
+                  <p className="text-sm text-gray-500 mt-1">Current PDF stored in Firestore (upload new to replace)</p>
+                )}
+                {uploadProgress && (
+                  <div className="mt-2 flex items-center space-x-2 text-sm text-blue-600">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>{uploadProgress}</span>
+                  </div>
                 )}
               </div>
 
@@ -377,15 +450,26 @@ const TestReportManagement = () => {
               <div className="flex space-x-4">
                 <button
                   type="submit"
-                  className="flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-metallic-gold to-yellow-600 text-white rounded-lg font-semibold hover:shadow-lg transition-all"
+                  disabled={uploading}
+                  className="flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-metallic-gold to-yellow-600 text-white rounded-lg font-semibold hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <Save className="w-5 h-5" />
-                  <span>Save Report</span>
+                  {uploading ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      <span>Uploading...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-5 h-5" />
+                      <span>Save Report</span>
+                    </>
+                  )}
                 </button>
                 <button
                   type="button"
                   onClick={() => setShowForm(false)}
-                  className="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg font-semibold hover:bg-gray-300 transition-all"
+                  disabled={uploading}
+                  className="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg font-semibold hover:bg-gray-300 transition-all disabled:opacity-50"
                 >
                   Cancel
                 </button>

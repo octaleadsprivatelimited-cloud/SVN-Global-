@@ -3,6 +3,8 @@ import ReactDOM from 'react-dom/client'
 import App from './App.jsx'
 import ErrorBoundary from './ErrorBoundary.jsx'
 import './index.css'
+// Initialize Firebase
+import './config/firebase.js'
 
 // Get root element
 const rootElement = document.getElementById('root')

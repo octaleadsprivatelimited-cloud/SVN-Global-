@@ -11,7 +11,7 @@ When accessing `https://svn-global.vercel.app/api/health`, the frontend HTML (he
    - Create a new Vercel project for backend
    - Root directory: `backend`
    - Environment variables:
-     - `MONGODB_URI`
+     - `FIREBASE_SERVICE_ACCOUNT` (or `FIREBASE_PROJECT_ID`, `FIREBASE_PRIVATE_KEY`, `FIREBASE_CLIENT_EMAIL`)
      - `SESSION_SECRET`
      - `NODE_ENV=production`
    - This will handle all `/api/*` routes
@@ -69,10 +69,9 @@ If both are in the same Vercel project:
 After deployment, test:
 - `https://your-backend-url.vercel.app/api/health` should return JSON
 - Should NOT show HTML/header/footer
-- Should show: `{"status":"ok","message":"SVN Global API is running",...}`
+- Should show: `{"status":"ok","message":"SVN Global API is running","firebase":"connected"}`
 
 ## Current Configuration
 
 - Backend: `backend/vercel.json` routes `/api/*` to `api/index.js`
 - Frontend: `frontend/vercel.json` proxies `/api/*` to backend (if separate deployment)
-

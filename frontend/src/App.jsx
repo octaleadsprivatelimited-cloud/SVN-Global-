@@ -14,30 +14,43 @@ import AdminDashboard from './pages/admin/AdminDashboard'
 import ProductManagement from './pages/admin/ProductManagement'
 import TestReportManagement from './pages/admin/TestReportManagement'
 
+// Layout component for public routes
+const PublicLayout = ({ children }) => {
+  return (
+    <div className="min-h-screen flex flex-col">
+      <Header />
+      <main className="flex-grow">
+        {children}
+      </main>
+      <Footer />
+    </div>
+  )
+}
+
 function App() {
   return (
-    <Router>
-      <div className="min-h-screen flex flex-col">
-        <Header />
-        <main className="flex-grow">
-          <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/minimal" element={<MinimalHome />} />
-            <Route path="/simple" element={<SimpleHome />} />
-            <Route path="/test" element={<TestHome />} />
-            <Route path="/about" element={<About />} />
-            <Route path="/products" element={<Products />} />
-            <Route path="/contact" element={<Contact />} />
-            <Route path="/test-reports" element={<TestReports />} />
-            {/* Admin Routes */}
-            <Route path="/admin" element={<AdminLogin />} />
-            <Route path="/admin/dashboard" element={<AdminDashboard />} />
-            <Route path="/admin/products" element={<ProductManagement />} />
-            <Route path="/admin/test-reports" element={<TestReportManagement />} />
-          </Routes>
-        </main>
-        <Footer />
-      </div>
+    <Router
+      future={{
+        v7_startTransition: true,
+        v7_relativeSplatPath: true
+      }}
+    >
+      <Routes>
+        {/* Public Routes with Header and Footer */}
+        <Route path="/" element={<PublicLayout><Home /></PublicLayout>} />
+        <Route path="/minimal" element={<PublicLayout><MinimalHome /></PublicLayout>} />
+        <Route path="/simple" element={<PublicLayout><SimpleHome /></PublicLayout>} />
+        <Route path="/test" element={<PublicLayout><TestHome /></PublicLayout>} />
+        <Route path="/about" element={<PublicLayout><About /></PublicLayout>} />
+        <Route path="/products" element={<PublicLayout><Products /></PublicLayout>} />
+        <Route path="/contact" element={<PublicLayout><Contact /></PublicLayout>} />
+        <Route path="/test-reports" element={<PublicLayout><TestReports /></PublicLayout>} />
+        {/* Admin Routes without Header and Footer */}
+        <Route path="/admin" element={<AdminLogin />} />
+        <Route path="/admin/dashboard" element={<AdminDashboard />} />
+        <Route path="/admin/products" element={<ProductManagement />} />
+        <Route path="/admin/test-reports" element={<TestReportManagement />} />
+      </Routes>
     </Router>
   )
 }

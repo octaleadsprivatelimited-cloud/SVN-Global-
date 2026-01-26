@@ -1,11 +1,44 @@
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Package, Layers, Box, Scissors, Boxes, FileText, Download, MessageCircle } from 'lucide-react'
+import { getApiEndpoint } from '../config/api'
+import { getImageDataURL } from '../utils/imageToBase64'
+import { downloadPDF } from '../utils/pdfDownload'
 
 const Products = () => {
   const whatsappNumber = '91XXXXXXXXXX' // Replace with actual WhatsApp number
+  const [products, setProducts] = useState([])
+  const [loading, setLoading] = useState(true)
 
-  const products = [
+  useEffect(() => {
+    fetchProducts()
+  }, [])
+
+  const fetchProducts = async () => {
+    try {
+      const response = await fetch(getApiEndpoint('/api/products'))
+      
+      if (!response.ok) {
+        console.warn('Products API returned non-OK status:', response.status)
+        setProducts([])
+        return
+      }
+      
+      const data = await response.json()
+      // Ensure we always have an array
+      setProducts(Array.isArray(data) ? data : [])
+    } catch (error) {
+      console.error('Error fetching products:', error)
+      // Fallback to empty array if API fails - will use fallback products
+      setProducts([])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Fallback products if API fails or no products (for initial display)
+  const fallbackProducts = [
     {
       icon: <Layers className="w-12 h-12" />,
       title: 'Mica Flakes',
@@ -83,6 +116,17 @@ const Products = () => {
     },
   ]
 
+  // Use API products if available, otherwise use fallback
+  const displayProducts = products.length > 0 ? products : fallbackProducts
+
+  if (loading) {
+    return (
+      <div className="pt-20 min-h-screen flex items-center justify-center">
+        <div className="text-xl">Loading products...</div>
+      </div>
+    )
+  }
+
   return (
     <div className="pt-20">
       {/* Hero Section */}
@@ -135,7 +179,15 @@ const Products = () => {
           </motion.div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {products.map((product, index) => (
+            {displayProducts.map((product, index) => {
+              // Handle both base64 (from Firestore) and URL images
+              const imageSrc = product.image 
+                ? (product.image.startsWith('data:') || product.image.startsWith('/') 
+                    ? product.image 
+                    : getImageDataURL(product.image))
+                : '/placeholder.jpg'
+              
+              return (
               <motion.div
                 key={index}
                 initial={{ opacity: 0, y: 30 }}
@@ -148,9 +200,12 @@ const Products = () => {
                 {/* Product Image */}
                 <div className="relative h-64 overflow-hidden">
                   <img 
-                    src={product.image} 
+                    src={imageSrc} 
                     alt={product.title}
                     className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                    onError={(e) => {
+                      e.target.src = '/placeholder.jpg'
+                    }}
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
                   <div className="absolute top-4 right-4 w-16 h-16 bg-gradient-to-br from-royal-blue to-royal-blue-dark rounded-xl flex items-center justify-center text-white shadow-lg">
@@ -204,17 +259,19 @@ const Products = () => {
                             <p className="text-xs text-gray-600">NABL Accredited</p>
                           </div>
                         </div>
-                        <motion.a
-                          href={product.testReport}
-                          target="_blank"
-                          rel="noopener noreferrer"
+                        <motion.button
+                          onClick={() => {
+                            if (product.testReport) {
+                              downloadPDF(product.testReport, `${product.title}_Test_Report.pdf`)
+                            }
+                          }}
                           whileHover={{ scale: 1.05 }}
                           whileTap={{ scale: 0.95 }}
                           className="flex items-center space-x-2 px-4 py-2 bg-royal-blue text-white rounded-lg hover:bg-royal-blue-dark transition-colors text-sm font-semibold"
                         >
                           <Download className="w-4 h-4" />
                           <span>View</span>
-                        </motion.a>
+                        </motion.button>
                       </div>
                     </div>
                   )}
@@ -233,7 +290,8 @@ const Products = () => {
                   </motion.a>
                 </div>
               </motion.div>
-            ))}
+              )
+            })}
           </div>
         </div>
       </section>

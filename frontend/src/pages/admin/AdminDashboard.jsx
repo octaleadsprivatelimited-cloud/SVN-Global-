@@ -3,6 +3,8 @@ import { useNavigate, Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Package, FileText, LogOut, Home, Shield } from 'lucide-react'
 import { getApiEndpoint } from '../../config/api'
+import { auth } from '../../config/firebase'
+import { signOut, onAuthStateChanged } from 'firebase/auth'
 
 const AdminDashboard = () => {
   const navigate = useNavigate()
@@ -15,27 +17,24 @@ const AdminDashboard = () => {
   })
 
   useEffect(() => {
-    checkAuth()
+    const unsubscribe = checkAuth()
     fetchStats()
+    return () => {
+      if (unsubscribe) unsubscribe()
+    }
   }, [])
 
-  const checkAuth = async () => {
-    try {
-      const response = await fetch(getApiEndpoint('/api/admin/check-auth'), {
-        credentials: 'include'
-      })
-      const data = await response.json()
-      if (!data.isAuthenticated) {
-        navigate('/admin')
-      } else {
+  const checkAuth = () => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
         setIsAuthenticated(true)
-        setUsername(data.username || 'Admin')
+        setUsername(user.email || 'Admin')
+      } else {
+        navigate('/admin')
       }
-    } catch (error) {
-      navigate('/admin')
-    } finally {
       setLoading(false)
-    }
+    })
+    return unsubscribe
   }
 
   const fetchStats = async () => {
@@ -44,23 +43,23 @@ const AdminDashboard = () => {
         fetch(getApiEndpoint('/api/products')),
         fetch(getApiEndpoint('/api/test-reports'))
       ])
-      const products = await productsRes.json()
-      const reports = await reportsRes.json()
+      
+      const products = productsRes.ok ? await productsRes.json() : []
+      const reports = reportsRes.ok ? await reportsRes.json() : []
+      
       setStats({
-        products: products.length || 0,
-        testReports: reports.length || 0
+        products: Array.isArray(products) ? products.length : 0,
+        testReports: Array.isArray(reports) ? reports.length : 0
       })
     } catch (error) {
       console.error('Error fetching stats:', error)
+      setStats({ products: 0, testReports: 0 })
     }
   }
 
   const handleLogout = async () => {
     try {
-      await fetch(getApiEndpoint('/api/admin/logout'), {
-        method: 'POST',
-        credentials: 'include'
-      })
+      await signOut(auth)
       navigate('/admin')
     } catch (error) {
       console.error('Logout error:', error)
@@ -82,7 +81,7 @@ const AdminDashboard = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200">
+      <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-40">
         <div className="container mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">

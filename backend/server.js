@@ -1,14 +1,27 @@
 import express from 'express'
 import cors from 'cors'
 import dotenv from 'dotenv'
-import bcrypt from 'bcryptjs'
-import cookieSession from 'cookie-session'
-import { connectDB } from './config/mongodb.js'
+import admin from 'firebase-admin'
+import { existsSync } from 'fs'
+import { join, dirname } from 'path'
+import { fileURLToPath } from 'url'
+import { checkFirebaseConnection } from './config/firebase.js'
 import * as ProductsModel from './models/products.js'
 import * as TestReportsModel from './models/testReports.js'
-import { getAdmin, verifyAdminPassword } from './models/admin.js'
 
-dotenv.config()
+// Load .env.development if it exists, otherwise .env
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = dirname(__filename)
+const envDevelopmentPath = join(__dirname, '.env.development')
+const envPath = join(__dirname, '.env')
+
+if (existsSync(envDevelopmentPath)) {
+  dotenv.config({ path: envDevelopmentPath })
+} else if (existsSync(envPath)) {
+  dotenv.config({ path: envPath })
+} else {
+  dotenv.config() // Default behavior
+}
 
 const app = express()
 
@@ -64,28 +77,98 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }))
 app.use(express.urlencoded({ extended: true, limit: '10mb' }))
 
-// Cookie session for serverless compatibility (Vercel)
-app.use(cookieSession({
-  name: 'session',
-  keys: [process.env.SESSION_SECRET || 'svn-global-secret-key-2024-change-in-production'],
-  maxAge: 24 * 60 * 60 * 1000, // 24 hours
-  httpOnly: true,
-  secure: process.env.NODE_ENV === 'production', // Use secure cookies in production (HTTPS)
-  sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // Required for cross-origin in production
-}))
-
-// Initialize MongoDB connection (for serverless, this is cached)
-connectDB().catch((error) => {
-  console.error('Failed to connect to MongoDB on startup:', error.message)
+// Initialize Firebase connection check
+checkFirebaseConnection().then((connected) => {
+  if (connected) {
+    console.log('✅ Firebase connection verified')
+  } else {
+    console.warn('⚠️  Firebase connection check failed, but continuing...')
+  }
+}).catch((error) => {
+  console.error('Failed to verify Firebase connection on startup:', error.message)
   // Don't throw - connection will be retried on first request
 })
 
-// Authentication middleware
-const requireAuth = (req, res, next) => {
-  if (req.session && req.session.isAuthenticated) {
+// Firebase Auth middleware
+const requireAuth = async (req, res, next) => {
+  try {
+    // Check if Firebase Admin SDK is initialized
+    try {
+      admin.app()
+    } catch (initError) {
+      console.error('Firebase Admin SDK not initialized:', initError.message)
+      return res.status(500).json({ 
+        success: false, 
+        message: 'Firebase Admin SDK not configured. Please add Firebase credentials to .env.development and restart the server.' 
+      })
+    }
+
+    const authHeader = req.headers.authorization
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ success: false, message: 'Unauthorized - No token provided' })
+    }
+
+    const idToken = authHeader.split('Bearer ')[1]
+    
+    if (!idToken || idToken.trim() === '') {
+      return res.status(401).json({ success: false, message: 'Unauthorized - Empty token' })
+    }
+    
+    // Verify Firebase ID token
+    let decodedToken
+    try {
+      decodedToken = await admin.auth().verifyIdToken(idToken)
+    } catch (verifyError) {
+      console.error('Token verification error:', verifyError.code, verifyError.message)
+      console.error('Full error:', verifyError)
+      
+      // Check if Firebase Admin SDK is not properly initialized
+      if (verifyError.message && (
+        verifyError.message.includes('default credentials') ||
+        verifyError.message.includes('credential') ||
+        verifyError.message.includes('not initialized') ||
+        verifyError.code === 'app/no-app'
+      )) {
+        return res.status(500).json({ 
+          success: false, 
+          message: 'Firebase Admin SDK not configured. Please add Firebase service account credentials to backend/.env.development and restart the server. See backend/.env.example for instructions.' 
+        })
+      }
+      
+      // Provide specific error messages
+      if (verifyError.code === 'auth/id-token-expired') {
+        return res.status(401).json({ 
+          success: false, 
+          message: 'Token expired. Please refresh the page and try again.' 
+        })
+      } else if (verifyError.code === 'auth/argument-error') {
+        return res.status(401).json({ 
+          success: false, 
+          message: 'Invalid token format. Please log in again.' 
+        })
+      } else if (verifyError.code === 'auth/invalid-credential' || verifyError.code === 'auth/credential') {
+        return res.status(500).json({ 
+          success: false, 
+          message: 'Firebase Admin SDK credentials are invalid or missing. Please check backend/.env.development file.' 
+        })
+      } else {
+        return res.status(401).json({ 
+          success: false, 
+          message: `Token verification failed: ${verifyError.message || verifyError.code || 'Unknown error'}. Please log in again.` 
+        })
+      }
+    }
+    
+    // Check if user is admin (you can customize this based on your needs)
+    // For now, we'll allow any authenticated user. You can add custom claims in Firebase Auth
+    req.user = decodedToken
     next()
-  } else {
-    res.status(401).json({ success: false, message: 'Unauthorized' })
+  } catch (error) {
+    console.error('Auth middleware error:', error)
+    res.status(500).json({ 
+      success: false, 
+      message: 'Authentication error: ' + (error.message || 'Unknown error') 
+    })
   }
 }
 
@@ -100,11 +183,9 @@ app.get('/', (req, res) => {
       testReports: '/api/test-reports',
       contact: 'POST /api/contact',
       admin: {
-        login: 'POST /api/admin/login',
-        logout: 'POST /api/admin/logout',
-        checkAuth: 'GET /api/admin/check-auth',
-        products: '/api/admin/products',
-        testReports: '/api/admin/test-reports'
+        checkAuth: 'GET /api/admin/check-auth (requires Firebase Auth token)',
+        products: '/api/admin/products (requires Firebase Auth token)',
+        testReports: '/api/admin/test-reports (requires Firebase Auth token)'
       }
     },
     documentation: 'Visit /api/health for server status'
@@ -114,13 +195,13 @@ app.get('/', (req, res) => {
 // Health check endpoint (useful for Vercel)
 app.get('/api/health', async (req, res) => {
   try {
-    // Test MongoDB connection
-    await connectDB()
+    // Test Firebase connection
+    const connected = await checkFirebaseConnection()
     res.setHeader('Content-Type', 'application/json')
     res.status(200).json({ 
       status: 'ok', 
       message: 'SVN Global API is running',
-      mongodb: 'connected',
+      firebase: connected ? 'connected' : 'disconnected',
       timestamp: new Date().toISOString(),
       environment: process.env.NODE_ENV || 'development'
     })
@@ -128,8 +209,8 @@ app.get('/api/health', async (req, res) => {
     res.setHeader('Content-Type', 'application/json')
     res.status(503).json({ 
       status: 'error', 
-      message: 'SVN Global API is running but MongoDB connection failed',
-      mongodb: 'disconnected',
+      message: 'SVN Global API is running but Firebase connection failed',
+      firebase: 'disconnected',
       error: error.message,
       timestamp: new Date().toISOString(),
       environment: process.env.NODE_ENV || 'development'
@@ -181,77 +262,22 @@ app.post('/api/contact', async (req, res) => {
 
 // ============ ADMIN ROUTES ============
 
-// Admin Login
-app.post('/api/admin/login', async (req, res) => {
+// Check Auth Status (using Firebase Auth token)
+app.get('/api/admin/check-auth', requireAuth, async (req, res) => {
   try {
-    const { username, password } = req.body
-    
-    if (!username || !password) {
-      return res.status(400).json({ success: false, message: 'Username and password are required' })
-    }
-
-    // Ensure MongoDB is connected
-    await connectDB()
-    const admin = await getAdmin()
-
-    if (!admin || username !== admin.username) {
-      return res.status(401).json({ success: false, message: 'Invalid credentials' })
-    }
-
-    // Verify password
-    const isValidPassword = await verifyAdminPassword(password, admin.password)
-
-    if (!isValidPassword) {
-      return res.status(401).json({ success: false, message: 'Invalid credentials' })
-    }
-
-    // Set session
-    req.session.isAuthenticated = true
-    req.session.username = admin.username // Use username from MongoDB
-
-    console.log(`✅ Admin login successful: ${admin.username}`)
-
-    res.json({ success: true, message: 'Login successful', username: admin.username })
-  } catch (error) {
-    console.error('Login error:', error)
-    res.status(500).json({ success: false, message: 'Server error: ' + error.message })
-  }
-})
-
-// Admin Logout
-app.post('/api/admin/logout', (req, res) => {
-  req.session = null
-  res.json({ success: true, message: 'Logged out successfully' })
-})
-
-// Check Auth Status
-app.get('/api/admin/check-auth', async (req, res) => {
-  try {
-    const isAuthenticated = req.session && req.session.isAuthenticated || false
-    let username = null
-    
-    if (isAuthenticated) {
-      // Get username from MongoDB to ensure it's always current
-      try {
-        await connectDB()
-        const admin = await getAdmin()
-        username = admin ? admin.username : req.session.username
-      } catch (error) {
-        // If MongoDB fails, use session username as fallback
-        username = req.session.username
-        console.error('Error fetching admin for check-auth:', error.message)
-      }
-    }
-    
     res.json({ 
-      isAuthenticated,
-      username
+      isAuthenticated: true,
+      user: {
+        uid: req.user.uid,
+        email: req.user.email,
+        emailVerified: req.user.email_verified
+      }
     })
   } catch (error) {
     console.error('Error checking auth:', error)
-    res.json({ 
+    res.status(401).json({ 
       isAuthenticated: false,
-      username: null
+      user: null
     })
   }
 })
@@ -261,19 +287,19 @@ app.get('/api/admin/check-auth', async (req, res) => {
 // Get all products
 app.get('/api/products', async (req, res) => {
   try {
-    await connectDB()
     const products = await ProductsModel.getAllProducts()
-    res.json(products || [])
+    // Always return an array, even if empty
+    res.json(Array.isArray(products) ? products : [])
   } catch (error) {
     console.error('Error fetching products:', error)
-    res.status(500).json({ success: false, message: 'Error fetching products: ' + error.message })
+    // Return empty array instead of error to prevent frontend crashes
+    res.status(200).json([])
   }
 })
 
 // Get single product
 app.get('/api/products/:id', async (req, res) => {
   try {
-    await connectDB()
     const product = await ProductsModel.getProductById(req.params.id)
     if (product) {
       res.json(product)
@@ -289,19 +315,29 @@ app.get('/api/products/:id', async (req, res) => {
 // Create product (Admin only)
 app.post('/api/admin/products', requireAuth, async (req, res) => {
   try {
-    await connectDB()
+    // Validate required fields
+    if (!req.body.title || !req.body.description) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Title and description are required' 
+      })
+    }
+    
     const newProduct = await ProductsModel.createProduct(req.body)
     res.json({ success: true, product: newProduct })
   } catch (error) {
     console.error('Error creating product:', error)
-    res.status(500).json({ success: false, message: 'Error creating product: ' + error.message })
+    const errorMessage = error.message || 'Unknown error occurred'
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error creating product: ' + errorMessage 
+    })
   }
 })
 
 // Update product (Admin only)
 app.put('/api/admin/products/:id', requireAuth, async (req, res) => {
   try {
-    await connectDB()
     const updatedProduct = await ProductsModel.updateProduct(req.params.id, req.body)
     if (updatedProduct) {
       res.json({ success: true, product: updatedProduct })
@@ -317,7 +353,6 @@ app.put('/api/admin/products/:id', requireAuth, async (req, res) => {
 // Delete product (Admin only)
 app.delete('/api/admin/products/:id', requireAuth, async (req, res) => {
   try {
-    await connectDB()
     const deleted = await ProductsModel.deleteProduct(req.params.id)
     if (deleted) {
       res.json({ success: true, message: 'Product deleted successfully' })
@@ -335,7 +370,6 @@ app.delete('/api/admin/products/:id', requireAuth, async (req, res) => {
 // Get all test reports
 app.get('/api/test-reports', async (req, res) => {
   try {
-    await connectDB()
     const reports = await TestReportsModel.getAllTestReports()
     res.json(reports || [])
   } catch (error) {
@@ -347,7 +381,6 @@ app.get('/api/test-reports', async (req, res) => {
 // Get single test report
 app.get('/api/test-reports/:id', async (req, res) => {
   try {
-    await connectDB()
     const report = await TestReportsModel.getTestReportById(req.params.id)
     if (report) {
       res.json(report)
@@ -363,7 +396,6 @@ app.get('/api/test-reports/:id', async (req, res) => {
 // Create test report (Admin only)
 app.post('/api/admin/test-reports', requireAuth, async (req, res) => {
   try {
-    await connectDB()
     const newReport = await TestReportsModel.createTestReport(req.body)
     res.json({ success: true, report: newReport })
   } catch (error) {
@@ -375,7 +407,6 @@ app.post('/api/admin/test-reports', requireAuth, async (req, res) => {
 // Update test report (Admin only)
 app.put('/api/admin/test-reports/:id', requireAuth, async (req, res) => {
   try {
-    await connectDB()
     const updatedReport = await TestReportsModel.updateTestReport(req.params.id, req.body)
     if (updatedReport) {
       res.json({ success: true, report: updatedReport })
@@ -391,7 +422,6 @@ app.put('/api/admin/test-reports/:id', requireAuth, async (req, res) => {
 // Delete test report (Admin only)
 app.delete('/api/admin/test-reports/:id', requireAuth, async (req, res) => {
   try {
-    await connectDB()
     const deleted = await TestReportsModel.deleteTestReport(req.params.id)
     if (deleted) {
       res.json({ success: true, message: 'Test report deleted successfully' })

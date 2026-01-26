@@ -1,0 +1,40 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Helper function to check if user is admin
+    // You can customize this based on custom claims or email domain
+    function isAdmin() {
+      return isAuthenticated() && 
+             (request.auth.token.admin == true || 
+              request.auth.token.email.matches('.*@svnglobal\\.com$') ||
+              request.auth.token.email == 'nagarajuwill@gmail.com');
+    }
+    
+    // Products collection - public read, admin write
+    match /products/{productId} {
+      allow read: if true; // Public read access
+      allow create, update, delete: if isAdmin(); // Only admins can write
+    }
+    
+    // Test Reports collection - public read, admin write
+    match /testReports/{reportId} {
+      allow read: if true; // Public read access
+      allow create, update, delete: if isAdmin(); // Only admins can write
+    }
+    
+    // Admin collection - no public access, admin only
+    match /admin/{adminId} {
+      allow read, write: if isAdmin(); // Only admins can access
+    }
+    
+    // Default deny all other collections
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

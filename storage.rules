@@ -1,0 +1,27 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Products folder - authenticated users can read, admins can write
+    match /products/{imageId} {
+      allow read: if true; // Public read access
+      allow write: if request.auth != null && 
+                      (request.auth.token.admin == true || 
+                       request.auth.token.email.matches('.*@svnglobal\\.com$') ||
+                       request.auth.token.email == 'nagarajuwill@gmail.com');
+    }
+    
+    // Test reports folder - authenticated users can read, admins can write
+    match /test-reports/{fileId} {
+      allow read: if true; // Public read access
+      allow write: if request.auth != null && 
+                      (request.auth.token.admin == true || 
+                       request.auth.token.email.matches('.*@svnglobal\\.com$') ||
+                       request.auth.token.email == 'nagarajuwill@gmail.com');
+    }
+    
+    // Default deny all other paths
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

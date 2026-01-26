@@ -6,11 +6,20 @@ Go to your Vercel project settings and add these environment variables:
 
 ### Required Environment Variables:
 
-1. **MONGODB_URI** or **MONGO_URI**
+1. **Firebase Configuration** (Choose one option):
+
+   **Option A: FIREBASE_SERVICE_ACCOUNT (Recommended)**
    ```
-   mongodb+srv://svnglobal:Svnglobal%402025@svnglobal.5vlys7w.mongodb.net/svnglobal?retryWrites=true&w=majority&appName=svnglobal
+   FIREBASE_SERVICE_ACCOUNT={"type":"service_account","project_id":"svn-global",...}
    ```
-   Note: The password `Svnglobal@2025` is URL encoded as `Svnglobal%402025`
+   Full JSON string of your Firebase service account key.
+
+   **Option B: Individual Variables**
+   ```
+   FIREBASE_PROJECT_ID=svn-global
+   FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
+   FIREBASE_CLIENT_EMAIL=firebase-adminsdk-xxxxx@svn-global.iam.gserviceaccount.com
+   ```
 
 2. **SESSION_SECRET**
    ```
@@ -28,13 +37,6 @@ Go to your Vercel project settings and add these environment variables:
    https://your-frontend-domain.vercel.app
    ```
    Or your custom domain if you have one
-
-### MongoDB Atlas Network Access
-
-Make sure your MongoDB Atlas cluster allows network access:
-1. Go to MongoDB Atlas → Network Access
-2. Add IP Address: `0.0.0.0/0` (allows all IPs) OR add Vercel's IP ranges
-3. Save changes
 
 ## Deployment Steps
 
@@ -54,7 +56,7 @@ Make sure your MongoDB Atlas cluster allows network access:
 
 4. **Verify Deployment**:
    - Check health endpoint: `https://your-backend.vercel.app/api/health`
-   - Should return: `{"status":"ok","message":"SVN Global API is running","mongodb":"connected"}`
+   - Should return: `{"status":"ok","message":"SVN Global API is running","firebase":"connected"}`
 
 ## Frontend Configuration
 
@@ -70,9 +72,9 @@ Or update `frontend/src/config/api.js` to detect Vercel deployment automatically
 ## Troubleshooting
 
 ### Connection Errors
-- Check that `MONGODB_URI` is set correctly in Vercel
-- Verify MongoDB Atlas network access allows your IPs
-- Check Vercel function logs for MongoDB connection errors
+- Check that Firebase environment variables are set correctly in Vercel
+- Verify Firebase service account has proper permissions
+- Check Vercel function logs for Firebase connection errors
 
 ### Session/Auth Issues
 - Ensure `SESSION_SECRET` is set in Vercel
@@ -91,10 +93,9 @@ backend/
 ├── api/
 │   └── index.js          # Vercel serverless entry point
 ├── config/
-│   └── mongodb.js        # MongoDB connection (serverless optimized)
-├── models/               # MongoDB models
+│   └── firebase.js       # Firebase Admin SDK connection
+├── models/               # Firestore models
 ├── server.js             # Express app (exports default)
 ├── vercel.json           # Vercel configuration
 └── package.json          # Dependencies
 ```
-

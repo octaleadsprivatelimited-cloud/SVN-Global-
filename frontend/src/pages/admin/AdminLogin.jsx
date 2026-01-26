@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Lock, User, Shield } from 'lucide-react'
-import { getApiEndpoint } from '../../config/api'
+import { Lock, User, Shield, Loader2 } from 'lucide-react'
+import { signInWithEmailAndPassword, onAuthStateChanged } from 'firebase/auth'
+import { auth } from '../../config/firebase'
 
 const AdminLogin = () => {
-  const [username, setUsername] = useState('')
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -13,25 +14,13 @@ const AdminLogin = () => {
 
   useEffect(() => {
     // Check if already logged in
-    checkAuth()
-  }, [])
-
-  const checkAuth = async () => {
-    try {
-      const response = await fetch(getApiEndpoint('/api/admin/check-auth'), {
-        credentials: 'include'
-      })
-      if (response.ok) {
-        const data = await response.json()
-        if (data.isAuthenticated) {
-          navigate('/admin/dashboard')
-        }
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        navigate('/admin/dashboard')
       }
-    } catch (error) {
-      // Silently fail - backend might not be running
-      console.error('Auth check failed:', error)
-    }
-  }
+    })
+    return () => unsubscribe()
+  }, [navigate])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -39,44 +28,37 @@ const AdminLogin = () => {
     setLoading(true)
 
     try {
-      const response = await fetch(getApiEndpoint('/api/admin/login'), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({ username, password }),
-      })
-
-      if (!response.ok) {
-        // Try to get error message from response
-        let errorMessage = 'Connection error. Unable to connect to the backend server.'
-        try {
-          const errorData = await response.json()
-          errorMessage = errorData.message || errorMessage
-        } catch (e) {
-          // If response is not JSON, use default message
-          if (response.status === 0 || response.status >= 500) {
-            const apiEndpoint = getApiEndpoint('/api/admin/login')
-            errorMessage = `Cannot connect to backend server. Attempted: ${apiEndpoint}. Please check: 1) Backend is deployed, 2) VITE_API_URL is set if backend is on different domain, 3) CORS is configured.`
-          }
-        }
-        setError(errorMessage)
-        setLoading(false)
-        return
-      }
-
-      const data = await response.json()
-
-      if (data.success) {
-        navigate('/admin/dashboard')
-      } else {
-        setError(data.message || 'Invalid credentials')
-      }
+      await signInWithEmailAndPassword(auth, email, password)
+      // Navigation will happen automatically via onAuthStateChanged
+      navigate('/admin/dashboard')
     } catch (error) {
       console.error('Login error:', error)
-      const apiEndpoint = getApiEndpoint('/api/admin/login')
-      setError(`Cannot connect to backend server. Attempted: ${apiEndpoint}. Please ensure: 1) Backend is deployed and running, 2) VITE_API_URL is set correctly if backend is on a different domain, 3) CORS is configured properly. Check browser console for more details.`)
+      let errorMessage = 'Login failed. Please check your credentials.'
+      
+      switch (error.code) {
+        case 'auth/user-not-found':
+          errorMessage = 'No account found with this email.'
+          break
+        case 'auth/wrong-password':
+          errorMessage = 'Incorrect password.'
+          break
+        case 'auth/invalid-email':
+          errorMessage = 'Invalid email address.'
+          break
+        case 'auth/user-disabled':
+          errorMessage = 'This account has been disabled.'
+          break
+        case 'auth/too-many-requests':
+          errorMessage = 'Too many failed attempts. Please try again later.'
+          break
+        case 'auth/network-request-failed':
+          errorMessage = 'Network error. Please check your connection.'
+          break
+        default:
+          errorMessage = error.message || 'Login failed. Please try again.'
+      }
+      
+      setError(errorMessage)
     } finally {
       setLoading(false)
     }
@@ -107,16 +89,16 @@ const AdminLogin = () => {
 
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Username
+                Email
               </label>
               <div className="relative">
                 <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <input
-                  type="text"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-royal-blue focus:border-royal-blue"
-                  placeholder="Enter username"
+                  placeholder="Enter email address"
                   required
                 />
               </div>
@@ -144,14 +126,21 @@ const AdminLogin = () => {
               disabled={loading}
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              className="w-full py-3 bg-gradient-to-r from-royal-blue to-royal-blue-dark text-white rounded-lg font-bold hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full py-3 bg-gradient-to-r from-royal-blue to-royal-blue-dark text-white rounded-lg font-bold hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
             >
-              {loading ? 'Logging in...' : 'Login'}
+              {loading ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <span>Logging in...</span>
+                </>
+              ) : (
+                <span>Login</span>
+              )}
             </motion.button>
           </form>
 
           <div className="mt-6 text-center text-sm text-gray-500">
-            <p>Default credentials: admin / admin123</p>
+            <p>Use your Firebase Auth email and password</p>
           </div>
         </div>
       </motion.div>

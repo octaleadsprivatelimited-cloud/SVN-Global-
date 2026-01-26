@@ -102,13 +102,30 @@ The backend is ready to deploy. Make sure to set up environment variables (see `
 Create a `.env` file in the `backend` directory:
 
 ```
+# Firebase Configuration (required)
+FIREBASE_SERVICE_ACCOUNT={"type":"service_account","project_id":"your-project-id",...}
+# OR use individual variables:
+# FIREBASE_PROJECT_ID=your-project-id
+# FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nYour key\n-----END PRIVATE KEY-----\n"
+# FIREBASE_CLIENT_EMAIL=firebase-adminsdk-xxxxx@your-project-id.iam.gserviceaccount.com
+
+# Server Configuration
 PORT=5000
+NODE_ENV=development
+SESSION_SECRET=your-secret-key-change-in-production
+
+# Frontend URL (for CORS)
+FRONTEND_URL=http://localhost:3000
+
+# Email Configuration (optional, for contact form)
 EMAIL_USER=your-email@gmail.com
 EMAIL_PASS=your-app-password
 CONTACT_EMAIL=contact@svnglobal.com
 ```
 
-**Note**: The contact form currently logs submissions to the console. To enable email sending, uncomment the nodemailer code in `backend/server.js` and configure your email credentials.
+**Note**: 
+- Firebase configuration is required. See `backend/.env.example` for details.
+- The contact form currently logs submissions to the console. To enable email sending, uncomment the nodemailer code in `backend/server.js` and configure your email credentials.
 
 ## Pages
 

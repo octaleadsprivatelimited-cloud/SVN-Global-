@@ -4,9 +4,19 @@
 
 Set these in your Vercel project settings (Settings → Environment Variables):
 
-### 1. MONGO_URI (Primary - Recommended)
+### 1. Firebase Configuration (Required)
+
+**Option A: FIREBASE_SERVICE_ACCOUNT (Recommended)**
 ```
-mongodb+srv://svnglobal:Svnglobal%402025@svnglobal.5vlys7w.mongodb.net/svnglobal?retryWrites=true&w=majority&appName=svnglobal
+FIREBASE_SERVICE_ACCOUNT={"type":"service_account","project_id":"svn-global",...}
+```
+Full JSON string of your Firebase service account key.
+
+**Option B: Individual Variables**
+```
+FIREBASE_PROJECT_ID=svn-global
+FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
+FIREBASE_CLIENT_EMAIL=firebase-adminsdk-xxxxx@svn-global.iam.gserviceaccount.com
 ```
 
 ### 2. SESSION_SECRET
@@ -32,8 +42,8 @@ Your frontend Vercel deployment URL
 2. Click on **Settings**
 3. Click on **Environment Variables**
 4. Add each variable:
-   - **Key**: `MONGO_URI`
-   - **Value**: (paste connection string)
+   - **Key**: `FIREBASE_SERVICE_ACCOUNT` (or individual Firebase variables)
+   - **Value**: (paste your Firebase credentials)
    - **Environment**: Select all (Production, Preview, Development)
 5. Click **Save**
 6. **Redeploy** your project after adding variables
@@ -42,11 +52,10 @@ Your frontend Vercel deployment URL
 
 After deployment, test:
 - `https://your-backend.vercel.app/api/health`
-- Should return JSON with `mongodb: "connected"`
+- Should return JSON with `firebase: "connected"`
 
 ## Notes
 
-- `MONGO_URI` is checked first, then `MONGODB_URI` as fallback
-- Password `Svnglobal@2025` is URL encoded as `Svnglobal%402025`
-- Make sure MongoDB Atlas allows network access for `0.0.0.0/0` (all IPs)
-
+- Firebase service account JSON can be obtained from Firebase Console → Project Settings → Service Accounts
+- Make sure the service account has proper permissions (Firestore Admin, Storage Admin)
+- For `FIREBASE_PRIVATE_KEY`, include the full key with `\n` for newlines

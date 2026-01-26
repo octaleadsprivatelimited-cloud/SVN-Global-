@@ -1,14 +1,37 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { FileText, Download, Calendar, Search, Filter, Award, Shield, CheckCircle, X } from 'lucide-react'
+import { getApiEndpoint } from '../config/api'
+import { getImageDataURL } from '../utils/imageToBase64'
+import { downloadPDF } from '../utils/pdfDownload'
 
 const TestReports = () => {
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('All')
   const [selectedReport, setSelectedReport] = useState(null)
+  const [testReports, setTestReports] = useState([])
+  const [loading, setLoading] = useState(true)
 
-  // Sample test reports - Replace with your actual reports
-  const testReports = [
+  useEffect(() => {
+    fetchReports()
+  }, [])
+
+  const fetchReports = async () => {
+    try {
+      const response = await fetch(getApiEndpoint('/api/test-reports'))
+      const data = await response.json()
+      setTestReports(data)
+    } catch (error) {
+      console.error('Error fetching test reports:', error)
+      // Fallback to empty array if API fails
+      setTestReports([])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Fallback test reports if API fails
+  const fallbackReports = [
     {
       id: 1,
       title: 'Quartz Test Report June 2025',
@@ -71,14 +94,25 @@ const TestReports = () => {
     },
   ]
 
+  // Use API reports if available, otherwise use fallback
+  const displayReports = testReports.length > 0 ? testReports : fallbackReports
+
   const categories = ['All', 'Mica', 'Quartz', 'Certifications']
 
-  const filteredReports = testReports.filter(report => {
+  const filteredReports = displayReports.filter(report => {
     const matchesSearch = report.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          report.description.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesCategory = selectedCategory === 'All' || report.category === selectedCategory
     return matchesSearch && matchesCategory
   })
+
+  if (loading) {
+    return (
+      <div className="pt-20 min-h-screen flex items-center justify-center">
+        <div className="text-xl">Loading test reports...</div>
+      </div>
+    )
+  }
 
   return (
     <div className="pt-20">
@@ -235,18 +269,18 @@ const TestReports = () => {
                     </div>
 
                     {/* Download Button */}
-                    <motion.a
-                      href={report.file}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={(e) => e.stopPropagation()}
+                    <motion.button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        downloadPDF(report.file, `${report.title.replace(/\s+/g, '_')}.pdf`)
+                      }}
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
                       className="w-full inline-flex items-center justify-center px-4 py-3 bg-gradient-to-r from-metallic-gold to-yellow-600 text-white rounded-xl font-bold hover:shadow-lg transition-all"
                     >
                       <Download className="w-5 h-5 mr-2" />
                       Download Report
-                    </motion.a>
+                    </motion.button>
                   </div>
                 </motion.div>
               ))}
@@ -331,17 +365,17 @@ const TestReports = () => {
                 </div>
               </div>
 
-              <motion.a
-                href={selectedReport.file}
-                target="_blank"
-                rel="noopener noreferrer"
+              <motion.button
+                onClick={() => {
+                  downloadPDF(selectedReport.file, `${selectedReport.title.replace(/\s+/g, '_')}.pdf`)
+                }}
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 className="w-full inline-flex items-center justify-center px-6 py-4 bg-gradient-to-r from-metallic-gold to-yellow-600 text-white rounded-xl font-bold text-lg hover:shadow-xl transition-all"
               >
                 <Download className="w-6 h-6 mr-3" />
                 Download Full Test Report
-              </motion.a>
+              </motion.button>
             </div>
           </motion.div>
         </motion.div>
